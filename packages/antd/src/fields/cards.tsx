@@ -54,17 +54,16 @@ const FormCardsField = styled(
           }}
         >
           {toArr(value).map((item, index) => {
+            let title = componentProps.title || schema.title
+            if (isFn(title)) title = title(schema, index, item)
+            else title = <span>{index + 1}. {title}</span>
             return (
               <Card
                 {...componentProps}
                 size="small"
                 className={`card-list-item`}
                 key={index}
-                title={
-                  <span>
-                    {index + 1}. {componentProps.title || schema.title}
-                  </span>
-                }
+                title={title}
                 extra={
                   <Fragment>
                     <ArrayList.Remove
