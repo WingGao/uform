@@ -14,7 +14,8 @@ import {
   isBool,
   isValid,
   FormPathPattern,
-  FormPath
+  FormPath,
+  deprecate
 } from '@uform/shared'
 import { SchemaMessage, ISchema } from '../types'
 
@@ -23,6 +24,8 @@ const numberRE = /^\d+$/
 type SchemaProperties<T = Schema> = {
   [key: string]: Schema
 }
+
+const cleanMs = (str: any) => String(str).replace(/\s*/g, '')
 
 export class Schema implements ISchema {
   /** base json schema spec**/
@@ -311,7 +314,10 @@ export class Schema implements ISchema {
     return this['x-component']
   }
   getExtendsRenderer() {
-    return this['x-render']
+    return deprecate(
+      this['x-render'],
+      'x-render is deprecate in future, Please do not use it.'
+    )
   }
   getExtendsEffect() {
     return this['x-effect']
@@ -329,6 +335,7 @@ export class Schema implements ISchema {
    * getters
    */
   setProperty(key: string, schema: ISchema) {
+    key = cleanMs(key)
     this.properties = this.properties || {}
     this.properties[key] = new Schema(schema, this, key)
     return this.properties[key]
@@ -389,6 +396,7 @@ export class Schema implements ISchema {
     }
     if (!isEmpty(json.properties)) {
       this.properties = map(json.properties, (item, key) => {
+        key = cleanMs(key)
         return new Schema(item, this, key)
       })
       if (isValid(json.additionalProperties)) {
@@ -396,6 +404,7 @@ export class Schema implements ISchema {
       }
       if (isValid(json.patternProperties)) {
         this.patternProperties = map(json.patternProperties, (item, key) => {
+          key = cleanMs(key)
           return new Schema(item, this, key)
         })
       }

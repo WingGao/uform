@@ -390,7 +390,7 @@ export function createForm<FieldProps, VirtualFieldProps>(
             // value > formValue > initialValue
             state.value = value
           } else {
-            state.value = isValid(formValue) ? formValue : initialValue
+            state.value = existFormValuesIn(dataPath) ? formValue : initialValue
           }
           // initialValue > formInitialValue
           state.initialValue = isValid(initialValue)
@@ -565,6 +565,12 @@ export function createForm<FieldProps, VirtualFieldProps>(
 
   function getFormValuesIn(path: FormPathPattern) {
     return getFormIn(path, 'values')
+  }
+
+  function existFormValuesIn(path: FormPathPattern) {
+    return state.getState(state =>
+      FormPath.existIn(state.values, transformDataPath(path))
+    )
   }
 
   function getFormInitialValuesIn(path: FormPathPattern) {
@@ -797,6 +803,8 @@ export function createForm<FieldProps, VirtualFieldProps>(
     })
 
     env.submittingTask = async () => {
+      // 增加onFormSubmitValidateStart来明确submit引起的校验开始了
+      heart.publish(LifeCycleTypes.ON_FORM_SUBMIT_VALIDATE_START, state)
       const validateResult = await validate('', { throwErrors: false })
       const { errors } = validateResult
       // 校验失败
@@ -815,6 +823,9 @@ export function createForm<FieldProps, VirtualFieldProps>(
 
         throw errors
       }
+
+      // 增加onFormSubmitValidateSucces来明确submit引起的校验最终的结果
+      heart.publish(LifeCycleTypes.ON_FORM_SUBMIT_VALIDATE_SUCCESS, state)
 
       // 因为要合并effectErrors/effectWarnings，所以不能直接读validate的结果
       const validated = state.getState(({ errors, warnings }) => ({
@@ -873,19 +884,32 @@ export function createForm<FieldProps, VirtualFieldProps>(
     })
     heart.publish(LifeCycleTypes.ON_FORM_VALIDATE_END, state)
 
+    // 增加name透出真实路径，和0.x保持一致
+    const result = {
+      errors: payload.errors.map(item => ({
+        ...item,
+        name: getFieldState(item.path).name
+      })),
+      warnings: payload.warnings.map(item => ({
+        ...item,
+        name: getFieldState(item.path).name
+      }))
+    }
+
+    const { errors, warnings } = result
+
     // 打印warnings日志从submit挪到这里
-    const { errors, warnings } = payload
     if (warnings.length) {
       console.warn(warnings)
     }
     if (errors.length > 0) {
       if (throwErrors) {
-        throw payload
+        throw result
       } else {
-        return payload
+        return result
       }
     } else {
-      return payload
+      return result
     }
   }
 
