@@ -21,7 +21,7 @@ const ArrayComponents = {
   MoveUpIcon: () => <Icon type="up" />
 }
 
-const FormTableField = styled(
+export const FormTableField = styled(
   (props: ISchemaFieldComponentProps & { className: string }) => {
     const { value, schema, className, editable, path, mutators } = props
     const {

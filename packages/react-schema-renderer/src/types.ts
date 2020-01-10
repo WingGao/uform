@@ -31,6 +31,8 @@ export interface ISchemaFieldComponentProps extends IFieldState {
     addtionKey: string | number,
     reactKey?: string | number
   ) => React.ReactElement
+  beforeRender?: () => React.ReactElement
+  afterRender?: () => React.ReactElement
 }
 export interface ISchemaVirtualFieldComponentProps extends IVirtualFieldState {
   schema: Schema

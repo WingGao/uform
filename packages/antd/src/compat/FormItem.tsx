@@ -69,7 +69,8 @@ const computeSchemaExtendProps = (
       'labelTextAlign',
       'size',
       'labelCol',
-      'wrapperCol'
+      'wrapperCol',
+      'colon'
     )
   }
 }
@@ -101,10 +102,16 @@ export const CompatAntdFormItem: React.FC<ICompatItemProps> = props => {
       help={help}
       validateStatus={status}
       extra={extra ? <p>{extra}</p> : undefined}
+      colon={props.colon}
+      className={props.className}
       {...itemProps}
       {...outerFormItemProps}
     >
-      <CompatAntdFormItemProps>{props.children}</CompatAntdFormItemProps>
+      <CompatAntdFormItemProps>
+        {props.beforeRender ? props.beforeRender() : false}
+        {props.children}
+        {props.afterRender ? props.afterRender() : false}
+      </CompatAntdFormItemProps>
     </Form.Item>
   )
 }

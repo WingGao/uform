@@ -10,7 +10,8 @@ import { normalizeCol } from '../shared'
 
 export const FormItemGrid = createVirtualBox<
   React.PropsWithChildren<IFormItemGridProps & ItemProps>
->('grid', props => {
+>('grid', FormItemGridComponent)
+export const FormItemGridComponent = props => {
   const {
     cols: rawCols,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -47,10 +48,10 @@ export const FormItemGrid = createVirtualBox<
       {children.reduce((buf, child, key) => {
         return child
           ? buf.concat(
-              <Col key={key} {...cols[key]}>
-                {child}
-              </Col>
-            )
+            <Col key={key} {...cols[key]}>
+              {child}
+            </Col>
+          )
           : buf
       }, [])}
     </Row>
@@ -64,7 +65,7 @@ export const FormItemGrid = createVirtualBox<
     )
   }
   return <Fragment>{grids}</Fragment>
-})
+}
 
 export const FormGridRow = createVirtualBox<RowProps & ItemProps & IItemProps>(
   'grid-row',
