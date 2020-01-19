@@ -21,7 +21,7 @@ export const useArrayList = (index: number = 0) => {
     let children: any
     if (renders && renders[name]) {
       if (isFn(renders[name]) || renders[name].styledComponentId) {
-        children = renders[name](context.currentIndex)
+        children = renders[name](context.currentIndex, context)
       } else {
         children = render(renders[name])
       }

@@ -8,17 +8,25 @@ import {
 import { toArr, isFn, isArr, FormPath } from '@uform/shared'
 import { ArrayList } from '@uform/react-shared-components'
 import { CircleButton, TextButton } from '../components/Button'
-import { Table, Form, Icon } from 'antd'
+import { Table, Form, Icon, Popconfirm } from 'antd'
 import { CompatAntdFormItemProps } from '../compat/FormItem'
 import styled from 'styled-components'
 
-const ArrayComponents = {
+export const ArrayComponents = {
   CircleButton,
   TextButton,
   AdditionIcon: () => <Icon type="plus" style={{ fontSize: 20 }} />,
   RemoveIcon: () => <Icon type="delete" />,
   MoveDownIcon: () => <Icon type="down" />,
-  MoveUpIcon: () => <Icon type="up" />
+  MoveUpIcon: () => <Icon type="up" />,
+  ConfirmButton: (props) => {
+    let { onClick, ...rest } = props
+    return <Popconfirm title={'是否删除'} onConfirm={onClick} okType='danger' okText={'删除'}>
+    <CircleButton {...rest}>
+      {rest.children ? rest.children : ArrayComponents.RemoveIcon()}
+    </CircleButton>
+  </Popconfirm>
+  }
 }
 
 export const FormTableField = styled(
@@ -30,15 +38,17 @@ export const FormTableField = styled(
       renderMoveDown,
       renderMoveUp,
       renderEmpty,
+      removeComponent,
       renderExtraOperations,
       operations,
+      newValue,
       ...componentProps
     } = schema.getExtendsComponentProps() || {}
     const onAdd = () => {
       const items = Array.isArray(schema.items)
         ? schema.items[schema.items.length - 1]
         : schema.items
-      mutators.push(items.getEmptyValue())
+      mutators.push(newValue ? newValue(value) : items.getEmptyValue())
     }
     const renderColumns = (items: Schema) => {
       return items.mapProperties((props, key) => {
@@ -58,7 +68,7 @@ export const FormTableField = styled(
                 key={newPath.toString()}
                 label={undefined}
               >
-                <SchemaField path={newPath} />
+                <SchemaField path={newPath} schema={props} />
               </CompatAntdFormItemProps>
             )
           }
@@ -82,6 +92,7 @@ export const FormTableField = styled(
                 <ArrayList.Remove
                   index={index}
                   onClick={() => mutators.remove(index)}
+                  component={removeComponent}
                 />
                 <ArrayList.MoveDown
                   index={index}
