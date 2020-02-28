@@ -1205,7 +1205,8 @@ export function createForm<FieldProps, VirtualFieldProps>(
     },
     notify: <T>(type: string, payload: T) => {
       heart.publish(type, payload)
-    }
+    },
+    getRawGraph: () => graph
   }
   const heart = new FormHeart({
     ...options,

@@ -368,4 +368,5 @@ export interface IForm {
   getFieldValue(path?: FormPathPattern): any
   setFieldInitialValue(path?: FormPathPattern, value?: any): void
   getFieldInitialValue(path?: FormPathPattern): any
+  getRawGraph(): FormGraph<any>
 }

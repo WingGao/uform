@@ -1,5 +1,5 @@
 import { useContext, useEffect } from 'react'
-import { isStateModel } from '@uform/core'
+import { isStateModel, IForm } from '@uform/core'
 import FormContext from '../context'
 import { useEva } from 'react-eva'
 import { IFormEffect } from '../types'
@@ -8,6 +8,10 @@ import { createFormEffects } from '../shared'
 
 export function useFormEffects(effects: IFormEffect) {
   const form = useContext(FormContext)
+  useFormEffects2(effects, form)
+}
+
+export function useFormEffects2(effects: IFormEffect, form: IForm) {
   const { dispatch } = useEva({
     effects: createFormEffects(effects, form)
   })
