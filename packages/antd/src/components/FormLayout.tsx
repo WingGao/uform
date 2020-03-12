@@ -4,11 +4,6 @@ import { createVirtualBox } from '@uform/react-schema-renderer'
 import cls from 'classnames'
 import { IFormItemTopProps } from '../types'
 
-export const FormLayout = createVirtualBox<IFormItemTopProps>(
-  'layout',
-  FormLayoutComponent
-)
-
 export const FormLayoutComponent = props => {
   const { inline } = useFormItem()
   const isInline = props.inline || inline
@@ -27,3 +22,8 @@ export const FormLayoutComponent = props => {
     )
   return <FormItemProvider {...props}>{children}</FormItemProvider>
 }
+
+export const FormLayout = createVirtualBox<IFormItemTopProps>(
+  'layout',
+  FormLayoutComponent
+)
