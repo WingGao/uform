@@ -25,7 +25,7 @@ function buildTempESM() {
     outDir: TEMP_OUT_DIR,
     module: ts.ModuleKind.ESNext
   })
-  compile(fileNames, options, { before: [transformer] })
+  compile(fileNames, options, { before: [transformer as any] })
 
   console.log('temporary esm build successfully')
 }
