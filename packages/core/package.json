@@ -1,6 +1,6 @@
 {
   "name": "@formily/core",
-  "version": "1.0.0-rc.4",
+  "version": "1.1.5",
   "license": "MIT",
   "main": "lib",
   "repository": {
@@ -19,16 +19,15 @@
     "build": "rimraf -rf lib && tsc --declaration"
   },
   "devDependencies": {
-    "typescript": "^3.5.2"
+    "typescript": "~3.8.0"
   },
   "peerDependencies": {
-    "@babel/runtime": "^7.4.4",
     "scheduler": ">=0.11.2"
   },
   "dependencies": {
-    "@formily/shared": "^1.0.0-rc.4",
-    "@formily/validator": "^1.0.0-rc.4",
-    "immer": "^3.2.0"
+    "@formily/shared": "^1.1.5",
+    "@formily/validator": "^1.1.5",
+    "immer": "^6.0.3"
   },
   "publishConfig": {
     "access": "public"

@@ -12,11 +12,21 @@ import {
 } from '@formily/react'
 import { ValidatePatternRules } from '@formily/validator'
 import { Schema } from './shared/schema'
-export * from '@formily/react/lib/types'
+export * from '@formily/react'
+
+declare global {
+  namespace FormilyCore {
+    // eslint-disable-next-line
+    export interface FieldProps extends ISchema {}
+    // eslint-disable-next-line
+    export interface VirtualFieldProps extends ISchema {}
+  }
+}
 
 export interface ISchemaFieldProps {
   path?: FormPathPattern
   schema?: Schema
+  onlyRenderProperties?: boolean
 }
 
 export type ComponentWithStyleComponent<
@@ -45,6 +55,12 @@ export interface ISchemaVirtualFieldComponentProps extends IVirtualFieldState {
     addtionKey: string | number,
     reactKey?: string | number
   ) => React.ReactElement
+}
+
+export type IVirtualBoxProps<Props> = Props & {
+  name?: string
+  visible?: boolean
+  display?: boolean
 }
 
 export interface ISchemaFieldWrapper<Props = any> {
@@ -91,7 +107,7 @@ export interface ISchema {
   default?: any
   readOnly?: boolean
   writeOnly?: boolean
-  type?: 'string' | 'object' | 'array' | 'number' | string
+  type?: 'string' | 'object' | 'array' | 'number' | 'boolean' | string
   enum?: Array<
     | string
     | number
@@ -112,7 +128,7 @@ export interface ISchema {
   uniqueItems?: boolean
   maxProperties?: number
   minProperties?: number
-  required?: string[] | boolean
+  required?: string[] | boolean | string
   format?: string
   /** nested json schema spec **/
   properties?: {
@@ -126,17 +142,18 @@ export interface ISchema {
   additionalProperties?: ISchema
   /** extend json schema specs */
   editable?: boolean
-  visible?: boolean
-  display?: boolean
+  visible?: boolean | string
+  display?: boolean | string
+  triggerType?: 'onBlur' | 'onChange'
   ['x-props']?: { [name: string]: any }
   ['x-index']?: number
   ['x-rules']?: ValidatePatternRules
   ['x-linkages']?: Array<{
-    name: FormPathPattern
     target: FormPathPattern
     type: string
     [key: string]: any
   }>
+  ['x-mega-props']?: { [name: string]: any }
   ['x-item-props']?: { [name: string]: any }
   ['x-component']?: string
   ['x-component-props']?: { [name: string]: any }
@@ -205,3 +222,10 @@ export interface ISchemaFormAsyncActions extends IFormAsyncActions {
   getSchema(): Promise<Schema>
   getFormSchema(): Promise<Schema>
 }
+
+export type MixinConnectedComponent<T extends string> = React.FC<
+  ISchemaFieldComponentProps
+> &
+  {
+    [key in T]: React.FC<ISchemaFieldComponentProps>
+  }

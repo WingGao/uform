@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import ReactDOM from 'react-dom'
-import { createFormActions } from '@formily/react-schema-renderer'
+import { createFormActions, Schema } from '@formily/react-schema-renderer'
 import styled from 'styled-components'
 import Modal from 'react-modal'
 
@@ -76,31 +76,8 @@ const createAlert = (config = {}) => {
   )
 }
 
-const cleanSchema = schema => {
-  if (!schema) return
-  return {
-    type: schema.type,
-    'x-props': schema['x-props'],
-    'x-component': schema['x-component'],
-    'x-index': schema['x-index'],
-    'x-rules': schema['x-rules'],
-    maxItems: schema.maxItems,
-    minItems: schema.minItems,
-    default: schema.default,
-    enum: schema.enum,
-    title: schema.title,
-    required: schema.required,
-    properties: Object.keys(schema.properties || {}).reduce((buf, key) => {
-      buf = buf || {}
-      buf[key] = cleanSchema(schema.properties[key])
-      return buf
-    }, undefined),
-    items: cleanSchema(schema.items)
-  }
-}
-
 const printSchema = schema => {
-  return JSON.stringify(cleanSchema(schema), null, 2)
+  return JSON.stringify(new Schema(schema).toJSON(), null, 2)
 }
 
 export default class extends React.Component {
@@ -124,7 +101,7 @@ export default class extends React.Component {
   }
 
   render() {
-    const { children, className } = this.props
+    const { children, className, noSchema } = this.props
     if (children && children.props && children.props.actions) {
       this.actions = children.props.actions
     }
@@ -145,19 +122,21 @@ export default class extends React.Component {
               )
             })
         })}
-        <a
-          href=""
-          style={{
-            fontSize: 12,
-            textDecoration: 'none',
-            margin: '20px 0',
-            display: 'block',
-            textAlign: 'center'
-          }}
-          onClick={this.onClickHandler}
-        >
-          Print JSON Schema
-        </a>
+        {!noSchema && (
+          <a
+            href=""
+            style={{
+              fontSize: 12,
+              textDecoration: 'none',
+              margin: '20px 0',
+              display: 'block',
+              textAlign: 'center'
+            }}
+            onClick={this.onClickHandler}
+          >
+            Print JSON Schema
+          </a>
+        )}
       </div>
     )
   }

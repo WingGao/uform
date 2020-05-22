@@ -7,17 +7,53 @@ import {
   IFieldState,
   IFormValidateResult,
   IFormState,
-  IFormResetOptions,
-  IFormSubmitResult,
-  FormHeartSubscriber,
-  IFormGraph,
   IField,
   IVirtualFieldState,
   IVirtualField
 } from '@formily/core'
-import { FormPathPattern } from '@formily/shared'
 import { Observable } from 'rxjs/internal/Observable'
-export * from '@formily/core/lib/types'
+export * from '@formily/core'
+
+type ILayoutLabelAlign = 'top' | 'left' | 'right'
+export interface ILayoutProps {
+  context?: any
+  isRoot?: boolean
+  isLayout?: boolean
+  defaultSettings?: any
+  children?: (props: ILayoutProps) => React.ReactElement
+  full?: boolean
+  label?: any
+  required?: boolean
+  labelAlign?: ILayoutLabelAlign
+  inline?: boolean
+  inset?: boolean
+  autoRow?: boolean
+  columns?: number
+  flex?: boolean
+  labelWidth?: number | string
+  wrapperWidth?: number | string
+  labelCol?: number
+  wrapperCol?: number
+  addonBefore?: any
+  addonAfter?: any
+  description?: any
+  gutter?: number | string
+  span?: number
+  grid?: boolean
+  responsive?: { lg?: number; m?: number; s?: number }
+  size?: string
+}
+
+export type ILayoutItemProps = {
+  span?: number
+  full?: boolean
+  labelAlign?: ILayoutLabelAlign
+  inset?: boolean
+  labelWidth?: number
+  wrapperWidth?: number
+  labelCol?: number
+  wrapperCol?: number
+}
 
 export interface IFormEffect<Payload = any, Actions = any> {
   (
@@ -80,7 +116,7 @@ export interface IVirtualFieldAPI {
 }
 
 export interface IFieldStateUIProps extends IFieldStateProps {
-  triggerType?: 'onChange' | 'onBlur'
+  triggerType?: 'onChange' | 'onBlur' | 'none'
   getValueFromEvent?: (...args: any[]) => any
   children?: React.ReactElement | ((api: IFieldAPI) => React.ReactElement)
 }
@@ -98,12 +134,13 @@ export interface IFormSpyAPI {
 }
 
 export interface IFormSpyProps {
-  selector?: string[] | string
+  selector?: string | string[] | string[][]
   reducer?: (
     state: any,
     action: { type: string; payload: any },
     form: IForm
   ) => any
+  initialState?: any
   children?: React.ReactElement | ((api: IFormSpyAPI) => React.ReactElement)
 }
 
@@ -115,7 +152,7 @@ export interface IFormConsumerAPI {
 }
 
 export interface IFormConsumerProps {
-  selector?: string[] | string
+  selector?: string | string[] | string[][]
   children?:
     | React.ReactElement
     | ((api: IFormConsumerAPI) => React.ReactElement)
@@ -142,62 +179,60 @@ export interface ISpyHook {
   type: string
 }
 
-export interface IFormActions {
-  submit(
-    onSubmit?: (values: IFormState['values']) => void | Promise<any>
-  ): Promise<IFormSubmitResult>
-  reset(options?: IFormResetOptions): void
-  hasChanged(target: any, path: FormPathPattern): boolean
-  validate(path?: FormPathPattern, options?: {}): Promise<IFormValidateResult>
-  setFormState(callback?: (state: IFormState) => any): void
-  getFormState(callback?: (state: IFormState) => any): any
-  clearErrors: (pattern?: FormPathPattern) => void
-  setFieldState(
-    path: FormPathPattern,
-    callback?: (state: IFieldState) => void
-  ): void
-  getFieldState(
-    path: FormPathPattern,
-    callback?: (state: IFieldState) => any
-  ): any
-  getFormGraph(): IFormGraph
-  setFormGraph(graph: IFormGraph): void
-  subscribe(callback?: FormHeartSubscriber): number
-  unsubscribe(id: number): void
-  notify: <T>(type: string, payload?: T) => void
-  dispatch: <T>(type: string, payload?: T) => void
-  setFieldValue(path?: FormPathPattern, value?: any): void
-  getFieldValue(path?: FormPathPattern): any
-  setFieldInitialValue(path?: FormPathPattern, value?: any): void
-  getFieldInitialValue(path?: FormPathPattern): any
+type OMitActions =
+  | 'registerField'
+  | 'registerVirtualField'
+  | 'unsafe_do_not_use_transform_data_path'
+
+export type IFormActions = Omit<IForm, OMitActions> & {
+  dispatch?: (type: string, payload: any) => void
 }
 
-export interface IFormAsyncActions {
-  submit(
-    onSubmit?: (values: IFormState['values']) => void | Promise<any>
-  ): Promise<IFormSubmitResult>
-  reset(options?: IFormResetOptions): Promise<void>
-  hasChanged(target: any, path: FormPathPattern): Promise<boolean>
-  clearErrors: (pattern?: FormPathPattern) => Promise<void>
-  validate(path?: FormPathPattern, options?: {}): Promise<IFormValidateResult>
-  setFormState(callback?: (state: IFormState) => any): Promise<void>
-  getFormState(callback?: (state: IFormState) => any): Promise<any>
-  setFieldState(
-    path: FormPathPattern,
-    callback?: (state: IFieldState) => void
-  ): Promise<void>
-  getFieldState(
-    path: FormPathPattern,
-    callback?: (state: IFieldState) => any
-  ): Promise<any>
-  getFormGraph(): Promise<IFormGraph>
-  setFormGraph(graph: IFormGraph): Promise<void>
-  subscribe(callback?: FormHeartSubscriber): Promise<number>
-  unsubscribe(id: number): Promise<void>
-  notify: <T>(type: string, payload: T) => Promise<void>
-  dispatch: <T>(type: string, payload: T) => void
-  setFieldValue(path?: FormPathPattern, value?: any): Promise<void>
-  getFieldValue(path?: FormPathPattern): Promise<any>
-  setFieldInitialValue(path?: FormPathPattern, value?: any): Promise<void>
-  getFieldInitialValue(path?: FormPathPattern): Promise<any>
+type WrapPromise<
+  T extends {
+    [key: string]: (...args: any) => any
+  }
+> = {
+  [key in keyof T]: (...args: Parameters<T[key]>) => Promise<ReturnType<T[key]>>
+}
+
+export type IFormAsyncActions = WrapPromise<IFormActions>
+
+export interface IEffectProviderAPI<TActions = any, TContext = any> {
+  waitFor: <TPayload = any>(
+    type: string,
+    filter: (payload: TPayload) => boolean
+  ) => Promise<TPayload>
+  triggerTo: <TPayload = any>(type: string, payload: TPayload) => void
+  applyMiddlewares: <TPayload = any>(
+    type: string,
+    payload: TPayload
+  ) => Promise<TPayload>
+  actions: TActions
+  context?: TContext
+}
+
+export interface IEffectMiddlewareAPI<TActions = any, TContext = any> {
+  waitFor: <TPayload = any>(
+    type: string,
+    filter: (payload: TPayload) => boolean
+  ) => Promise<TPayload>
+  actions: TActions
+  context?: TContext
+}
+
+export interface IEffectProviderHandler<TActions = any, TContext = any> {
+  (options: IEffectProviderAPI<TActions, TContext>): (
+    $: (type: string) => Observable<any>,
+    actions: TActions
+  ) => void
+}
+
+export interface IEffectMiddleware<TActions = any, TContext = any> {
+  (options: IEffectMiddlewareAPI<TActions, TContext>): {
+    [key: string]: <TPayload = any>(
+      payload: TPayload,
+      next: (payload: any) => Promise<any>
+    ) => Promise<any>
+  }
 }

@@ -7,19 +7,25 @@ import { toArr, isFn, FormPath } from '@formily/shared'
 import { ArrayList } from '@formily/react-shared-components'
 import { CircleButton } from '../circle-button'
 import { TextButton } from '../text-button'
-import { Card, Icon } from 'antd'
+import { Card } from 'antd'
+import {
+  PlusOutlined,
+  DeleteOutlined,
+  DownOutlined,
+  UpOutlined
+} from '@ant-design/icons'
 import styled from 'styled-components'
 
 const ArrayComponents = {
   CircleButton,
   TextButton,
-  AdditionIcon: () => <Icon type="plus" />,
-  RemoveIcon: () => <Icon type="delete" />,
-  MoveDownIcon: () => <Icon type="down" />,
-  MoveUpIcon: () => <Icon type="up" />
+  AdditionIcon: () => <PlusOutlined />,
+  RemoveIcon: () => <DeleteOutlined />,
+  MoveDownIcon: () => <DownOutlined />,
+  MoveUpIcon: () => <UpOutlined />
 }
 
-export const ArrayCards : any = styled(
+export const ArrayCards: any = styled(
   (props: ISchemaFieldComponentProps & { className: string }) => {
     const { value, schema, className, editable, path, mutators } = props
     const {
@@ -31,11 +37,15 @@ export const ArrayCards : any = styled(
       renderExtraOperations,
       ...componentProps
     } = schema.getExtendsComponentProps() || {}
+
+    const schemaItems = Array.isArray(schema.items)
+      ? schema.items[schema.items.length - 1]
+      : schema.items
+
     const onAdd = () => {
-      const items = Array.isArray(schema.items)
-        ? schema.items[schema.items.length - 1]
-        : schema.items
-      mutators.push(items.getEmptyValue())
+      if (schemaItems) {
+        mutators.push(schemaItems.getEmptyValue())
+      }
     }
     return (
       <div className={className}>
@@ -84,18 +94,23 @@ export const ArrayCards : any = styled(
                   </Fragment>
                 }
               >
-                <SchemaField path={FormPath.parse(path).concat(index)} />
+                {schemaItems && (
+                  <SchemaField
+                    path={FormPath.parse(path).concat(index)}
+                    schema={schemaItems}
+                  />
+                )}
               </Card>
             )
           })}
           <ArrayList.Empty>
-            {({ children }) => {
+            {({ children, allowAddition }) => {
               return (
                 <Card
                   {...componentProps}
                   size="small"
-                  className={`card-list-item card-list-empty`}
-                  onClick={onAdd}
+                  className={`card-list-item card-list-empty ${allowAddition ? 'add-pointer' : ''}`}
+                  onClick={allowAddition ? onAdd : undefined}
                 >
                   <div className="empty-wrapper">{children}</div>
                 </Card>
@@ -118,6 +133,7 @@ export const ArrayCards : any = styled(
     )
   }
 )<ISchemaFieldComponentProps>`
+  width: 100%;
   .ant-card {
     .ant-card {
       box-shadow: none;
@@ -146,7 +162,7 @@ export const ArrayCards : any = styled(
       }
     }
   }
-  .card-list-empty.card-list-item {
+  .card-list-empty.card-list-item.add-pointer {
     cursor: pointer;
   }
 

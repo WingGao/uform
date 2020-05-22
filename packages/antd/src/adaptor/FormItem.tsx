@@ -5,8 +5,9 @@ import {
   FormItemShallowProvider,
   useShallowFormItem
 } from '../context'
-import { IFormItemTopProps, ISchemaFieldAdaptorProps } from '../types'
-import { normalizeCol } from '../shared'
+import { ISchemaFieldAdaptorProps } from '../types'
+import { normalizeCol, pickFormItemProps } from '../shared'
+import { MegaLayoutItem } from '../components/FormMegaLayout/index'
 
 const computeStatus = (props: ISchemaFieldAdaptorProps) => {
   if (props.loading) {
@@ -47,34 +48,12 @@ const computeExtra = (props: ISchemaFieldAdaptorProps) => {
   if (props.extra) return props.extra
 }
 
-function pickProps<T = {}>(obj: T, ...keys: (keyof T)[]): Pick<T, keyof T> {
-  const result: Pick<T, keyof T> = {} as any
-  for (let i = 0; i < keys.length; i++) {
-    if (obj[keys[i]] !== undefined) {
-      result[keys[i]] = obj[keys[i]]
-    }
-  }
-  return result
-}
-
-const computeSchemaExtendProps = (
-  props: ISchemaFieldAdaptorProps
-): IFormItemTopProps => {
+const computeSchemaExtendProps = (props: ISchemaFieldAdaptorProps) => {
   if (props.schema) {
-    return pickProps(
-      {
-        ...props.schema.getExtendsItemProps(),
-        ...props.schema.getExtendsProps()
-      },
-      'required',
-      'className',
-      'prefixCls',
-      'labelAlign',
-      'hasFeedback',
-      'labelCol',
-      'wrapperCol',
-      'colon'
-    )
+    return pickFormItemProps({
+      ...props.schema.getExtendsItemProps(),
+      ...props.schema.getExtendsProps()
+    })
   }
 }
 
@@ -83,44 +62,75 @@ export const AntdSchemaFieldAdaptor: React.FC<ISchemaFieldAdaptorProps> = props 
     prefixCls,
     labelAlign,
     labelCol: contextLabelCol,
-    wrapperCol: contextWrapperCol
+    wrapperCol: contextWrapperCol,
+    size
   } = useDeepFormItem()
   const help = computeHelp(props)
   const label = computeLabel(props)
   const status = computeStatus(props)
   const extra = computeExtra(props)
-  const itemProps = computeSchemaExtendProps(props)
+  const formItemProps = pickFormItemProps(props)
+  const schemaItemProps = computeSchemaExtendProps(props)
   const formItemShallowProps = useShallowFormItem()
 
   const mergedProps = {
-    ...itemProps,
-    ...formItemShallowProps
+    label,
+    ...formItemShallowProps,
+    ...formItemProps,
+    ...schemaItemProps
   }
 
   const { labelCol, wrapperCol } = mergedProps
 
-  return (
-    <Form.Item
-      prefixCls={prefixCls}
-      label={label}
-      labelAlign={labelAlign}
-      required={props.editable ? props.required : undefined}
-      help={help}
-      validateStatus={status}
-      extra={extra ? <p>{extra}</p> : undefined}
-      colon={props.colon}
-      className={props.className}
-      {...mergedProps}
-      labelCol={label ? normalizeCol(labelCol || contextLabelCol) : undefined}
-      wrapperCol={
-        label ? normalizeCol(wrapperCol || contextWrapperCol) : undefined
-      }
-    >
+  const addonAfter = mergedProps.addonAfter
+
+  delete mergedProps.addonAfter
+
+  const itemProps = {
+    prefixCls,
+    labelAlign,
+    help,
+    validateStatus: status,
+    extra: extra ? <p>{extra}</p> : undefined,
+    ...mergedProps,
+    required: props.editable === false ? undefined : props.required,
+    labelCol: label ? normalizeCol(labelCol || contextLabelCol) : {},
+    wrapperCol: label ? normalizeCol(wrapperCol || contextWrapperCol) : {}
+  }
+
+  const renderComponent = (children, opts?) => {
+    const { addonAfter } = opts || {}
+    return addonAfter ? (
+      <div style={{ display: 'flex', alignItems: 'center' }}>
+        <FormItemShallowProvider>{children}</FormItemShallowProvider>
+        {addonAfter}
+      </div>
+    ) : (
       <FormItemShallowProvider>
         {props.beforeRender ? props.beforeRender() : false}
-        {props.children}
+        {children}
         {props.afterRender ? props.afterRender() : false}
       </FormItemShallowProvider>
-    </Form.Item>
+    )
+  }
+
+  return (
+    <MegaLayoutItem
+      itemProps={{ ...itemProps, size }}
+      {...props.props}
+      schemaChildren={props.children}
+    >
+      {megaComponent => {
+        if (megaComponent) {
+          return renderComponent(megaComponent, { addonAfter })
+        }
+
+        return (
+          <Form.Item {...itemProps}>
+            {renderComponent(props.children, { addonAfter })}
+          </Form.Item>
+        )
+      }}
+    </MegaLayoutItem>
   )
 }

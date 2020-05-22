@@ -4,8 +4,10 @@ import {
   ValidateNodeResult,
   ValidateFieldOptions
 } from '@formily/validator'
+import { createForm } from './index'
 import { FormLifeCycle } from './shared/lifecycle'
 import { Draft } from 'immer'
+export * from '@formily/validator'
 
 export type FormLifeCycleHandler<T> = (payload: T, context: any) => void
 
@@ -34,11 +36,14 @@ export enum LifeCycleTypes {
   ON_FORM_SUBMIT_VALIDATE_START = 'onFormSubmitValidateStart',
   ON_FORM_SUBMIT_VALIDATE_SUCCESS = 'onFormSubmitValidateSuccess',
   ON_FORM_SUBMIT_VALIDATE_FAILED = 'onFormSubmitValidateFailed',
+  ON_FORM_ON_SUBMIT_SUCCESS = 'onFormOnSubmitSuccess',
+  ON_FORM_ON_SUBMIT_FAILED = 'onFormOnSubmitFailed',
   ON_FORM_VALUES_CHANGE = 'onFormValuesChange',
   ON_FORM_INITIAL_VALUES_CHANGE = 'onFormInitialValuesChange',
   ON_FORM_VALIDATE_START = 'onFormValidateStart',
   ON_FORM_VALIDATE_END = 'onFormValidateEnd',
   ON_FORM_INPUT_CHANGE = 'onFormInputChange',
+  ON_FORM_HOST_RENDER = 'onFormHostRender',
   /**
    * FormGraph LifeCycle
    **/
@@ -104,7 +109,11 @@ export type StateDirtyMap<P> = {
 export interface StateModel<P> {
   publishState?: (state: P) => P
   dirtyCheck?: (dirtys: StateDirtyMap<P>) => StateDirtyMap<P> | void
-  computeState?: (state: Draft<P>, preState?: P) => Draft<P> | void
+  computeState?: (
+    state: Draft<P>,
+    preState?: P,
+    dirtys?: StateDirtyMap<P>
+  ) => Draft<P> | void
 }
 
 export interface IStateModelFactory<S, P> {
@@ -146,14 +155,30 @@ export interface IFieldState<FieldProps = any> {
   effectWarnings: string[]
   ruleWarnings: string[]
   value: any
+  visibleCacheValue: any
   initialValue: any
   rules: ValidatePatternRules[]
   required: boolean
   mounted: boolean
   unmounted: boolean
+  unmountRemoveValue: boolean
   props: FieldProps
   [key: string]: any
 }
+
+export type IFieldUserState<FieldProps = any> = Omit<
+  IFieldState<FieldProps>,
+  | 'errors'
+  | 'effectErrors'
+  | 'ruleErrors'
+  | 'warnings'
+  | 'effectWarnings'
+  | 'ruleWarnings'
+> & {
+  errors: React.ReactNode | React.ReactNode[]
+  warnings: React.ReactNode | React.ReactNode[]
+}
+
 export type FieldStateDirtyMap = StateDirtyMap<IFieldState>
 
 export interface IFieldStateProps<FieldProps = any> {
@@ -166,13 +191,13 @@ export interface IFieldStateProps<FieldProps = any> {
   values?: any[]
   initialValue?: any
   props?: FieldProps
-  rules?: ValidatePatternRules[]
+  rules?: ValidatePatternRules[] | ValidatePatternRules
   required?: boolean
   editable?: boolean
+  unmountRemoveValue?: boolean
   visible?: boolean
   display?: boolean
   useDirty?: boolean
-  useListMode?: boolean
   computeState?: (draft: IFieldState, prevState: IFieldState) => void
 }
 
@@ -203,18 +228,18 @@ export const isStateModel = (target: any): target is IModel =>
   target && isFn(target.getState)
 
 export interface IFormState<FormProps = any> {
-  pristine: boolean
   valid: boolean
   invalid: boolean
   loading: boolean
   validating: boolean
+  modified: boolean
   submitting: boolean
   initialized: boolean
   editable: boolean | ((name: string) => boolean)
   errors: string[]
   warnings: string[]
-  values: {}
-  initialValues: {}
+  values: any
+  initialValues: any
   mounted: boolean
   unmounted: boolean
   props: FormProps
@@ -237,7 +262,6 @@ export interface IFormCreatorOptions extends IFormStateProps {
   onSubmit?: (values: IFormState['values']) => any | Promise<any>
   onReset?: () => void
   onValidateFailed?: (validated: IFormValidateResult) => void
-  validateConcurrentTimeMS?: number
 }
 
 export interface IVirtualFieldState<FieldProps = any> {
@@ -290,26 +314,10 @@ export interface IFormGraph {
 
 export type IFormExtendedValidateFieldOptions = ValidateFieldOptions & {
   throwErrors?: boolean
+  hostRendering?: boolean
 }
 
-export interface IMutators {
-  change(...values: any[]): any
-  focus(): void
-  blur(): void
-  push(value?: any): any[]
-  pop(): any[]
-  insert(index: number, value: any): any[]
-  remove(index: number | string): any
-  unshift(value: any): any[]
-  shift(): any[]
-  move($from: number, $to: number): any[]
-  moveDown(index: number): any[]
-  moveUp(index: number): any[]
-  validate(
-    opts?: IFormExtendedValidateFieldOptions
-  ): Promise<IFormValidateResult>
-  exist(index?: number | string): boolean
-}
+export type IMutators = ReturnType<IForm['createMutators']>
 
 export interface IModel<S = {}, P = {}> extends Subscribable {
   state: S
@@ -326,19 +334,12 @@ export interface IModel<S = {}, P = {}> extends Subscribable {
   setState: (callback?: (state: S | Draft<S>) => void, silent?: boolean) => void
   getSourceState: (callback?: (state: S) => any) => any
   setSourceState: (callback?: (state: S) => void) => void
-  watchProps: <T extends { [key: string]: any }>(
-    props: T,
-    keys: string[],
-    callback: (
-      changedProps: {
-        [key: string]: any
-      },
-      props: T
-    ) => void
-  ) => void
   hasChanged: (path?: FormPathPattern) => boolean
   isDirty: (key?: string) => boolean
   getDirtyInfo: () => StateDirtyMap<S>
+  setCache: (key: string, value: any) => void
+  getCache: (key: string) => any
+  removeCache: (key: string) => void
 }
 
 export type IField = IModel<IFieldState, IFieldStateProps>
@@ -347,40 +348,4 @@ export type IVirtualField = IModel<IVirtualFieldState, IVirtualFieldStateProps>
 
 export type IFormInternal = IModel<IFormState, IFormStateProps>
 
-export interface IForm {
-  submit(
-    onSubmit?: (values: IFormState['values']) => any | Promise<any>
-  ): Promise<IFormSubmitResult>
-  clearErrors: (pattern?: FormPathPattern) => void
-  hasChanged(target: any, path: FormPathPattern): boolean
-  reset(options?: IFormResetOptions): Promise<void | IFormValidateResult>
-  validate(
-    path?: FormPathPattern,
-    options?: IFormExtendedValidateFieldOptions
-  ): Promise<IFormValidateResult>
-  setFormState(callback?: (state: IFormState) => any, silent?: boolean): void
-  getFormState(callback?: (state: IFormState) => any): any
-  setFieldState(
-    path: FormPathPattern,
-    callback?: (state: IFieldState) => void,
-    silent?: boolean
-  ): void
-  getFieldState(
-    path: FormPathPattern,
-    callback?: (state: IFieldState) => any
-  ): any
-  unsafe_do_not_use_transform_data_path(path: FormPathPattern): FormPathPattern //eslint-disable-line
-  registerField(props: IFieldStateProps): IField
-  registerVirtualField(props: IVirtualFieldStateProps): IVirtualField
-  createMutators(field: IField): IMutators
-  getFormGraph(): IFormGraph
-  setFormGraph(graph: IFormGraph): void
-  subscribe(callback?: FormHeartSubscriber): number
-  unsubscribe(id: number): void
-  notify: <T>(type: string, payload?: T) => void
-  setFieldValue(path?: FormPathPattern, value?: any): void
-  getFieldValue(path?: FormPathPattern): any
-  setFieldInitialValue(path?: FormPathPattern, value?: any): void
-  getFieldInitialValue(path?: FormPathPattern): any
-  getRawGraph(): FormGraph<any>
-}
+export type IForm = ReturnType<typeof createForm>

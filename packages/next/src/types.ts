@@ -12,7 +12,7 @@ import {
 } from '@formily/react-schema-renderer'
 import { PreviewTextConfigProps } from '@formily/react-shared-components'
 import { StyledComponent } from 'styled-components'
-export * from '@formily/react-schema-renderer/lib/types'
+export * from '@formily/react-schema-renderer'
 
 type ColSpanType = number | string
 
@@ -33,6 +33,11 @@ export type INextFormItemProps = IFieldStateUIProps &
     valueName?: string
     eventName?: string
     component?: React.JSXElementConstructor<any>
+    itemStyle?: {
+      [key: string]: string | number
+    }
+    itemClassName?: string
+    [key: string]: any
   }
 
 export type INextSchemaFieldProps = IMarkupSchemaFieldProps
@@ -68,12 +73,14 @@ export type IFormItemTopProps = React.PropsWithChildren<
   }
 >
 
-export interface ISchemaFieldAdaptorProps
-  extends Omit<ItemProps, 'labelCol' | 'wrapperCol'>,
-    Partial<ISchemaFieldComponentProps> {
-  labelCol?: number | { span: number; offset?: number }
-  wrapperCol?: number | { span: number; offset?: number }
-}
+export type ISchemaFieldAdaptorProps = Omit<
+  ItemProps,
+  'labelCol' | 'wrapperCol'
+> &
+  Partial<ISchemaFieldComponentProps> & {
+    labelCol?: number | { span: number; offset?: number }
+    wrapperCol?: number | { span: number; offset?: number }
+  }
 
 export type StyledCP<P extends {}> = StyledComponent<
   (props: React.PropsWithChildren<P>) => React.ReactElement,

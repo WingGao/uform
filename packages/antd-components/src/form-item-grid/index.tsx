@@ -1,28 +1,28 @@
 import React, { Fragment } from 'react'
-import { AntdSchemaFieldAdaptor } from '@formily/antd'
+import {
+  AntdSchemaFieldAdaptor,
+  pickFormItemProps,
+  pickNotFormItemProps
+} from '@formily/antd'
 import { createVirtualBox } from '@formily/react-schema-renderer'
 import { toArr } from '@formily/shared'
 import { Row, Col } from 'antd'
 import { FormItemProps as ItemProps } from 'antd/lib/form'
-import { IFormItemGridProps } from '../types'
+import { IFormItemGridProps, IItemProps } from '../types'
 import { normalizeCol } from '../shared'
 
 export const FormItemGrid = createVirtualBox<
-  React.PropsWithChildren<IFormItemGridProps & ItemProps>
+  React.PropsWithChildren<IFormItemGridProps & ItemProps & IItemProps>
 >('grid', FormItemGridComponent)
 export const FormItemGridComponent = props => {
   const {
     cols: rawCols,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     title,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    description,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    help,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    extra,
-    ...selfProps
+    label
   } = props
+  const formItemProps = pickFormItemProps(props)
+  const gridProps = pickNotFormItemProps(props)
   const children = toArr(props.children)
   const cols = toArr(rawCols).map(col => normalizeCol(col))
   const childNum = children.length
@@ -43,7 +43,7 @@ export const FormItemGridComponent = props => {
     }
   }
   const grids = (
-    <Row {...selfProps}>
+    <Row {...gridProps}>
       {children.reduce((buf, child, key) => {
         return child
           ? buf.concat(
@@ -56,9 +56,9 @@ export const FormItemGridComponent = props => {
     </Row>
   )
 
-  if (title) {
+  if (title || label) {
     return (
-      <AntdSchemaFieldAdaptor label={title} help={description} extra={extra}>
+      <AntdSchemaFieldAdaptor {...formItemProps}>
         {grids}
       </AntdSchemaFieldAdaptor>
     )

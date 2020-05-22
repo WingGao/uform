@@ -28,13 +28,13 @@ In React, the whole tree rendering performance problem of the form is very obvio
 Use Ant Design：
 
 ```bash
-npm install --save antd @formily/antd
+npm install --save antd @formily/antd @formily/antd-components
 ```
 
 Use Fusion Design：
 
 ```bash
-npm install --save @alifd/next @formily/next
+npm install --save @alifd/next @formily/next @formily/next-components
 ```
 
 Use formily react render engine pacakge:
@@ -59,7 +59,6 @@ npm install --save @formily/core
 
 ![](https://img.alicdn.com/tfs/TB1BvlRu4D1gK0jSZFsXXbldVXa-1882-1144.png)
 
-
 ## WebSite
 
 https://formilyjs.org
@@ -72,23 +71,18 @@ https://formilyjs.org
 - [@formily/react](./packages/react/README.md)
 - [@formily/core](./packages/core/README.md)
 
-
 ## Demo
 
 [codesandbox](https://codesandbox.io/s/o5up7)
 
 ## Community
 
-| Online Chat Room                                             | 微信                                                         | 钉钉 |
-| ------------------------------------------------------------ | ------------------------------------------------------------ | ---- |
-| [gitter.im](https://gitter.im/alibaba-formily/community?source=orgpage) | <img width="200" src="https://img.alicdn.com/tfs/TB1jhm5VNYaK1RjSZFnXXa80pXa-620-824.png"/> |   <img width="200" src="https://img.alicdn.com/tfs/TB1pHMzUrPpK1RjSZFFXXa5PpXa-620-818.png"/>   |
-
+- [icejs](https://github.com/alibaba/ice)
 
 ## Contributors
 
-This project exists thanks to all the people who contribute. 
+This project exists thanks to all the people who contribute.
 <a href="https://github.com/alibaba/formily/graphs/contributors"><img src="https://opencollective.com/formily/contributors.svg?width=890" /></a>
-
 
 ## LICENSE
 

@@ -7,23 +7,28 @@ const HEAD_HTML = `
 window.codeSandBoxDependencies = {
   '@alifd/next': 'latest',
   '@formily/next': 'latest',
+  '@formily/next-components': 'latest',
   '@formily/antd': 'latest',
+  '@formily/antd-components': 'latest',
+  '@formily/shared': 'latest',
   '@formily/react': 'latest',
   '@formily/printer': 'latest',
   '@babel/runtime':'latest',
+  'mfetch':'latest',
   antd: 'latest'
 }
 
 window.codeSandBoxPeerDependencies = {
   moment: 'latest'
 }
+if (window.parent !== window) {
+  try {
+    window.__FORMILY_DEV_TOOLS_HOOK__ = window.parent.__FORMILY_DEV_TOOLS_HOOK__;
+  } catch (error) {
+    // The above line can throw if we do not have access to the parent frame -- i.e. cross origin
+  }
+}
 </script>
-`
-
-const FOOTER_HTML = `
-<script src="//unpkg.com/moment/min/moment-with-locales.js"></script>
-<script src="//unpkg.com/antd/dist/antd.min.js"></script>
-<script src="//unpkg.com/@alifd/next/dist/next.min.js"></script>
 `
 
 const createDocs = async () => {
@@ -47,17 +52,9 @@ const createDocs = async () => {
       title: 'Formily',
       renderer: path.resolve(__dirname, './doc-renderer.js'),
       header: HEAD_HTML,
-      footer: FOOTER_HTML
     },
     (webpackConfig, env) => {
       webpackConfig.devtool = 'none'
-      webpackConfig.externals = {
-        ...webpackConfig.externals,
-        '@alifd/next': 'Next',
-        antd: 'antd',
-        moment: 'moment'
-      }
-
       webpackConfig.module.rules = webpackConfig.module.rules.map(rule => {
         if (rule.test.test('.tsx')) {
           return {

@@ -1,10 +1,12 @@
 import React from 'react'
-import { isArr, each, isFn, isValid } from '@formily/shared'
+import { isArr, each, isFn, isValid, defaults } from '@formily/shared'
+import { useLayout } from '@formily/react'
 import {
   ISchema,
   IConnectOptions,
   ISchemaFieldComponentProps,
-  IConnectProps
+  IConnectProps,
+  MixinConnectedComponent
 } from '../types'
 import { Schema } from './schema'
 
@@ -12,12 +14,9 @@ const createEnum = (enums: any) => {
   if (isArr(enums)) {
     return enums.map(item => {
       if (typeof item === 'object') {
-        return {
-          ...item
-        }
+        return item
       } else {
         return {
-          ...item,
           label: item,
           value: item
         }
@@ -55,16 +54,20 @@ const bindEffects = (
   return props
 }
 
-export const connect = (options?: IConnectOptions) => {
-  options = {
-    valueName: 'value',
-    eventName: 'onChange',
-    ...options
-  }
+export const connect = <ExtendsComponentKey extends string = ''>(
+  options?: IConnectOptions
+) => {
+  options = defaults(
+    {
+      valueName: 'value',
+      eventName: 'onChange'
+    },
+    options
+  )
   return (Component: React.JSXElementConstructor<any>) => {
-    const ConnectedComponent: React.FC<ISchemaFieldComponentProps> & {
-      [key: string]: any
-    } = (fieldProps: ISchemaFieldComponentProps) => {
+    const ConnectedComponent: MixinConnectedComponent<ExtendsComponentKey> = ((
+      fieldProps: ISchemaFieldComponentProps
+    ) => {
       const { value, name, mutators, form, editable, props } = fieldProps
       const schema = new Schema(props)
       const schemaComponentProps = schema.getExtendsComponentProps()
@@ -75,7 +78,15 @@ export const connect = (options?: IConnectOptions) => {
         [options.eventName]: (event: any, ...args: any[]) => {
           mutators.change(
             options.getValueFromEvent
-              ? options.getValueFromEvent.call(schema, event, ...args)
+              ? options.getValueFromEvent.call(
+                  {
+                    props: componentProps,
+                    schema,
+                    field: fieldProps
+                  },
+                  event,
+                  ...args
+                )
               : event,
             ...args
           )
@@ -83,8 +94,18 @@ export const connect = (options?: IConnectOptions) => {
             schemaComponentProps[options.eventName](event, ...args)
           }
         },
-        onBlur: () => mutators.blur(),
-        onFocus: () => mutators.focus()
+        onBlur: (...args: any) => {
+          mutators.blur()
+          if (isFn(schemaComponentProps['onBlur'])) {
+            schemaComponentProps[options.eventName](...args)
+          }
+        },
+        onFocus: (...args: any) => {
+          mutators.focus()
+          if (isFn(schemaComponentProps['onFocus'])) {
+            schemaComponentProps[options.eventName](...args)
+          }
+        }
       }
       if (isValid(editable)) {
         if (isFn(editable)) {
@@ -117,10 +138,26 @@ export const connect = (options?: IConnectOptions) => {
 
       if (isArr((props as ISchema).enum) && !componentProps.dataSource) {
         componentProps.dataSource = createEnum((props as ISchema).enum)
+      } else if (componentProps.dataSource) {
+        componentProps.dataSource = createEnum(componentProps.dataSource)
       }
 
       if (isValid(componentProps.editable)) {
         delete componentProps.editable
+      }
+
+      const megaProps = schema.getMegaLayoutProps()
+      const { full, size } = useLayout(megaProps)
+      if (full) {
+        componentProps.style = {
+          ...(componentProps.style || {}),
+          width: '100%',
+          flex: 1,
+        }
+      }
+
+      if (size) {
+        componentProps.size = size
       }
 
       return React.createElement(
@@ -129,9 +166,11 @@ export const connect = (options?: IConnectOptions) => {
           : Component,
         componentProps
       )
-    }
+    }) as any
 
-    ConnectedComponent['__ALREADY_CONNECTED__'] = true
+    Object.assign(ConnectedComponent, {
+      __ALREADY_CONNECTED__: true
+    })
 
     return ConnectedComponent
   }

@@ -6,7 +6,8 @@ import { render } from '../shared/virtual-render'
 import {
   ISchemaFormProps,
   IMarkupSchemaFieldProps,
-  ISchemaVirtualFieldComponentProps
+  ISchemaVirtualFieldComponentProps,
+  IVirtualBoxProps
 } from '../types'
 
 const env = {
@@ -76,7 +77,7 @@ export function createVirtualBox<T = {}>(
     key,
     component
       ? ({ schema, children }) => {
-          const props = schema.getExtendsComponentProps(false)
+          const props = schema.getExtendsComponentProps()
           return React.createElement(component, {
             children,
             ...props
@@ -84,11 +85,13 @@ export function createVirtualBox<T = {}>(
         }
       : () => <Fragment />
   )
-  const VirtualBox: React.FC<T & {
-    name?: string
-    visible?: boolean
-    display?: boolean
-  }> = ({ children, name, visible, display, ...props }) => {
+  const VirtualBox: React.FC<IVirtualBoxProps<T>> = ({
+    children,
+    name,
+    visible,
+    display,
+    ...props
+  }) => {
     return (
       <SchemaMarkupField
         type="object"
@@ -96,7 +99,6 @@ export function createVirtualBox<T = {}>(
         visible={visible}
         display={display}
         x-component={key}
-        x-props={props}
         x-component-props={props}
       >
         {children}
@@ -111,7 +113,7 @@ export function createControllerBox<T = {}>(
   component?: React.JSXElementConstructor<ISchemaVirtualFieldComponentProps>
 ) {
   registerVirtualBox(key, component ? component : () => <Fragment />)
-  const VirtualBox: React.FC<T & { name?: string }> = ({
+  const VirtualBox: React.FC<IVirtualBoxProps<T>> = ({
     children,
     name,
     ...props
@@ -121,7 +123,6 @@ export function createControllerBox<T = {}>(
         type="object"
         name={name}
         x-component={key}
-        x-props={props}
         x-component-props={props}
       >
         {children}

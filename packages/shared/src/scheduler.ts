@@ -1,36 +1,19 @@
-import { isFn } from './types'
+/* eslint-disable */
+import {
+  unstable_scheduleCallback,
+  unstable_LowPriority,
+  unstable_IdlePriority,
+  unstable_NormalPriority
+} from 'scheduler'
 
-export const scheduler = (concurrent = 360) => {
-  let operating = false
-  let buffer = []
-  const applyQueue = () => {
-    operating = true
-    requestAnimationFrame(() => {
-      let expireTime = performance.now() + concurrent,
-        operateEndTime = 0
-      while (true) {
-        if (expireTime < operateEndTime) break
-        const fn = buffer.shift()
-        if (fn) {
-          fn()
-          operateEndTime = performance.now()
-        } else {
-          break
-        }
-      }
-
-      if (buffer.length > 0) {
-        applyQueue()
-      } else {
-        operating = false
-      }
-    })
-  }
-  return (fn: any) => {
-    if (!isFn(fn)) return
-    buffer.push(fn)
-    if (!operating) {
-      applyQueue()
-    }
+export const scheduler = {
+  applyWithIdlePriority(callback:()=>void){
+    unstable_scheduleCallback(unstable_IdlePriority,callback)
+  },
+  applyWithLowPriority(callback: () => void) {
+    unstable_scheduleCallback(unstable_LowPriority, callback)
+  },
+  applyWidthNormalPriority(callback: () => void) {
+    unstable_scheduleCallback(unstable_NormalPriority, callback)
   }
 }

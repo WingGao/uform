@@ -4,13 +4,19 @@ import {
   IConnectProps,
   MergedFieldComponentProps
 } from '@formily/react-schema-renderer'
+import { version } from 'antd'
+import { each } from '@formily/shared'
 export * from '@formily/shared'
+
+export const isAntdV4 = /^4\./.test(version)
 
 export const autoScrollInValidateFailed = (formRef: any) => {
   if (formRef.current) {
     setTimeout(() => {
       const elements = formRef.current.querySelectorAll(
-        '.next-form-item.has-error'
+        isAntdV4
+          ? '.ant-form-item-has-error'
+          : '.ant-form-item-control.has-error'
       )
       if (elements && elements.length) {
         if (!elements[0].scrollIntoView) return
@@ -48,14 +54,71 @@ export const transformDataSourceKey = (component, dataSourceKey) => {
 }
 
 export const normalizeCol = (
-  col: { span: number; offset?: number } | number,
+  col?: { span: number; offset?: number } | number,
   defaultValue?: { span: number }
-): { span: number; offset?: number } => {
+): { span: number; offset?: number } | undefined => {
   if (!col) {
     return defaultValue
   } else {
     return typeof col === 'object' ? col : { span: Number(col) }
   }
+}
+
+export const pickProps = (object: any, targets: string[]) => {
+  const selected: any = {}
+  const otherwise: any = {}
+  each(object, (value: any, key: string) => {
+    if (targets.includes(key)) {
+      selected[key] = value
+    } else {
+      otherwise[key] = value
+    }
+  })
+  return {
+    selected,
+    otherwise
+  }
+}
+
+const NextFormItemProps = [
+  'colon',
+  'htmlFor',
+  'validateStatus',
+  'prefixCls',
+  'required',
+  'labelAlign',
+  'hasFeedback',
+  'labelCol',
+  'wrapperCol',
+  'label',
+  'help',
+  'extra',
+  'itemStyle',
+  'itemClassName',
+  'addonAfter'
+]
+
+export const pickFormItemProps = (props: any) => {
+  const { selected } = pickProps(props, NextFormItemProps)
+  if (!props.label && props.title) {
+    selected.label = props.title
+  }
+  if (!props.help && props.description) {
+    selected.help = props.description
+  }
+  if (selected.itemStyle) {
+    selected.style = selected.itemStyle
+    delete selected.itemStyle
+  }
+  if (selected.itemClassName) {
+    selected.className = selected.itemClassName
+    delete selected.itemClassName
+  }
+  return selected
+}
+
+export const pickNotFormItemProps = (props: any) => {
+  return pickProps(props, NextFormItemProps).otherwise
 }
 
 export const mapStyledProps = (

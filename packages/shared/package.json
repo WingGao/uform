@@ -1,6 +1,6 @@
 {
   "name": "@formily/shared",
-  "version": "1.0.0-rc.4",
+  "version": "1.1.5",
   "license": "MIT",
   "main": "lib",
   "types": "lib/index.d.ts",
@@ -23,11 +23,13 @@
     "build": "tsc --declaration"
   },
   "devDependencies": {
-    "typescript": "^3.5.2"
+    "typescript": "~3.8.0"
   },
   "dependencies": {
-    "camel-case": "^3.0.0",
+    "camel-case": "~3.0.0",
     "cool-path": "^0.1.23",
-    "deepmerge": "^4.0.0"
+    "lower-case": "~1.1.4",
+    "scheduler": "~0.19.0",
+    "upper-case": "~1.1.3"
   }
 }

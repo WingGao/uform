@@ -38,11 +38,15 @@ export const ArrayCards = styled(
       renderExtraOperations,
       ...componentProps
     } = schema.getExtendsComponentProps() || {}
+
+    const schemaItems = Array.isArray(schema.items)
+      ? schema.items[schema.items.length - 1]
+      : schema.items
+
     const onAdd = () => {
-      const items = Array.isArray(schema.items)
-        ? schema.items[schema.items.length - 1]
-        : schema.items
-      mutators.push(items.getEmptyValue())
+      if (schemaItems) {
+        mutators.push(schemaItems.getEmptyValue())
+      }
     }
     return (
       <div className={className}>
@@ -92,18 +96,23 @@ export const ArrayCards = styled(
                   </Fragment>
                 }
               >
-                <SchemaField path={FormPath.parse(path).concat(index)} />
+                {schemaItems && (
+                  <SchemaField
+                    path={FormPath.parse(path).concat(index)}
+                    schema={schemaItems}
+                  />
+                )}
               </Card>
             )
           })}
           <ArrayList.Empty>
-            {({ children }) => {
+            {({ children, allowAddition }) => {
               return (
                 <Card
                   {...componentProps}
-                  className={`card-list-item card-list-empty`}
+                  className={`card-list-item card-list-empty ${allowAddition ? 'add-pointer' : ''}`}
                   contentHeight="auto"
-                  onClick={onAdd}
+                  onClick={allowAddition ? onAdd : undefined}
                 >
                   <div className="empty-wrapper">{children}</div>
                 </Card>
@@ -126,6 +135,7 @@ export const ArrayCards = styled(
     )
   }
 )<ISchemaFieldComponentProps>`
+  width: 100%;
   .next-card-body {
     padding-top: 30px;
     padding-bottom: 0 !important;
@@ -174,7 +184,7 @@ export const ArrayCards = styled(
       }
     }
   }
-  .card-list-empty.card-list-item {
+  .card-list-empty.card-list-item.add-pointer {
     cursor: pointer;
   }
   .next-card.card-list-item {

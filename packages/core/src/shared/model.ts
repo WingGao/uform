@@ -8,9 +8,10 @@ import {
   FormPath,
   FormPathPattern,
   isValid,
-  toArr
+  defaults,
+  shallowClone
 } from '@formily/shared'
-import produce, { Draft, setAutoFreeze } from 'immer'
+import { Draft, Immer, enablePatches, setAutoFreeze } from 'immer'
 import {
   IStateModelProvider,
   IStateModelFactory,
@@ -20,19 +21,13 @@ import {
 } from '../types'
 const hasProxy = !!globalThisPolyfill.Proxy
 
+enablePatches()
+
 setAutoFreeze(false)
 
-const defaults = (...args:any[]):any=>{
-  const result = {}
-  each(args,(target)=>{
-    each(target,(value,key)=>{
-      if(isValid(value)){
-        result[key] = value
-      }
-    })
-  })
-  return result
-}
+const { produce } = new Immer({
+  autoFreeze: false
+})
 
 export const createStateModel = <State = {}, Props = {}>(
   Factory: IStateModelFactory<State, Props>
@@ -45,7 +40,7 @@ export const createStateModel = <State = {}, Props = {}>(
         useDirty?: boolean
         computeState?: (draft: State, prevState: State) => void
       }
-    public cacheProps?: any
+    public cache?: any
     public displayName?: string
     public dirtyNum: number
     public dirtys: StateDirtyMap<State>
@@ -57,9 +52,10 @@ export const createStateModel = <State = {}, Props = {}>(
     constructor(defaultProps: DefaultProps) {
       super()
       this.state = { ...Factory.defaultState }
-      this.prevState = { ...Factory.defaultState }
-      this.props = defaults(Factory.defaultProps,defaultProps)
+      this.prevState = this.state
+      this.props = defaults(Factory.defaultProps, defaultProps)
       this.dirtys = {}
+      this.cache = {}
       this.dirtyNum = 0
       this.stackCount = 0
       this.batching = false
@@ -111,34 +107,16 @@ export const createStateModel = <State = {}, Props = {}>(
       }
     }
 
-    watchProps = <T extends { [key: string]: any }>(
-      props: T,
-      keys: string[],
-      callback: (
-        changedProps: {
-          [key: string]: any
-        },
-        props?: T
-      ) => void
-    ) => {
-      if (!this.cacheProps) {
-        this.cacheProps = { ...props }
-      } else {
-        let changeNum = 0
-        let changedProps = {}
-        toArr(keys).forEach((key: string) => {
-          if (!isEqual(this.cacheProps[key], props[key])) {
-            changeNum++
-            changedProps[key] = props[key]
-          }
-        })
-        if (changeNum > 0) {
-          if (isFn(callback)) {
-            callback(changedProps, props)
-          }
-          this.cacheProps = { ...props }
-        }
-      }
+    setCache = (key: string, value: any) => {
+      this.cache[key] = shallowClone(value)
+    }
+
+    getCache = (key: string) => {
+      return this.cache[key]
+    }
+
+    removeCache = (key: string) => {
+      delete this.cache[key]
     }
 
     setState = (
@@ -208,7 +186,7 @@ export const createStateModel = <State = {}, Props = {}>(
             patches => {
               patches.forEach(({ path, op, value }) => {
                 if (op === 'replace') {
-                  if (!isEqual(this.state[path[0]], value)) {
+                  if (path.length > 1 || !isEqual(this.state[path[0]], value)) {
                     this.dirtys[path[0]] = true
                     this.dirtyNum++
                   }
@@ -238,7 +216,7 @@ export const createStateModel = <State = {}, Props = {}>(
 
         this.stackCount--
         if (!this.stackCount) {
-          this.prevState = { ...this.state }
+          this.prevState = this.state
         }
       }
     }

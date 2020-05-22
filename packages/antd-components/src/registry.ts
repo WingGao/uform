@@ -17,6 +17,7 @@ import { Upload } from './upload'
 export const setup = () => {
   registerFormFields({
     time: TimePicker,
+    timerange: TimePicker.RangePicker,
     transfer: Transfer,
     boolean: Switch,
     array: ArrayCards,
@@ -27,6 +28,7 @@ export const setup = () => {
     daterange: DatePicker.RangePicker,
     year: DatePicker.YearPicker,
     month: DatePicker.MonthPicker,
+    week: DatePicker.WeekPicker,
     string: Input,
     textarea: Input.TextArea,
     number: NumberPicker,

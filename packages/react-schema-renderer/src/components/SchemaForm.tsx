@@ -3,7 +3,11 @@ import { ISchemaFormProps } from '../types'
 import { Form } from '@formily/react'
 import { SchemaField } from './SchemaField'
 import { useSchemaForm } from '../hooks/useSchemaForm'
-import SchemaContext, { FormComponentsContext } from '../shared/context'
+import SchemaContext, {
+  FormComponentsContext,
+  FormExpressionScopeContext
+} from '../shared/context'
+import { log } from '@formily/shared'
 
 export const SchemaForm: React.FC<ISchemaFormProps> = props => {
   const {
@@ -20,25 +24,27 @@ export const SchemaForm: React.FC<ISchemaFormProps> = props => {
     <FormComponentsContext.Provider
       value={{ fields, virtualFields, formComponent, formItemComponent }}
     >
-      <SchemaContext.Provider value={schema}>
-        <Form form={form}>
-          {React.createElement(
-            formComponent,
-            {
-              ...formComponentProps,
-              onSubmit: (e: any) => {
-                if (e && e.preventDefault) e.preventDefault()
-                form.submit().catch(e => console.warn(e))
+      <FormExpressionScopeContext.Provider value={props.expressionScope}>
+        <SchemaContext.Provider value={schema}>
+          <Form form={form}>
+            {React.createElement(
+              formComponent,
+              {
+                ...formComponentProps,
+                onSubmit: (e: any) => {
+                  if (e && e.preventDefault) e.preventDefault()
+                  form.submit().catch(e => log.warn(e))
+                },
+                onReset: () => {
+                  form.reset({ validate: false, forceClear: false })
+                }
               },
-              onReset: () => {
-                form.reset({ validate: false, forceClear: false })
-              }
-            },
-            <SchemaField schema={schema} path={''} />,
-            children
-          )}
-        </Form>
-      </SchemaContext.Provider>
+              <SchemaField schema={schema} path={''} />,
+              children
+            )}
+          </Form>
+        </SchemaContext.Provider>
+      </FormExpressionScopeContext.Provider>
     </FormComponentsContext.Provider>
   )
 }

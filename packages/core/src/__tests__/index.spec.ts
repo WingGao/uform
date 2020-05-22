@@ -31,13 +31,19 @@ const deepValues = {
   }
 }
 
+const sleep = (d = 1000) =>
+  new Promise(resolve => {
+    setTimeout(() => {
+      resolve()
+    }, d)
+  })
+
 describe('createForm', () => {
   test('values', () => {
     const form = createForm({
       values: testValues
     })
     expect(form.getFormState(state => state.values)).toEqual(testValues)
-    expect(form.getFormState(state => state.pristine)).toEqual(false)
     expect(form.getFormState(state => state.initialized)).toEqual(true)
     expect(form.getFormGraph()).toMatchSnapshot()
   })
@@ -50,7 +56,6 @@ describe('createForm', () => {
     const bb = form.registerField({ path: 'bb' })
     expect(form.getFormState(state => state.values)).toEqual(testValues)
     expect(form.getFormState(state => state.initialValues)).toEqual(testValues)
-    expect(form.getFormState(state => state.pristine)).toEqual(true)
     expect(form.getFormState(state => state.initialized)).toEqual(true)
     expect(aa.getState(state => state.value)).toEqual(testValues.aa)
     expect(bb.getState(state => state.value)).toEqual(testValues.bb)
@@ -75,7 +80,6 @@ describe('createForm', () => {
     })
     expect(form.getFormState(state => state.values)).toEqual(testValues)
     expect(form.getFormState(state => state.initialValues)).toEqual(testValues)
-    expect(form.getFormState(state => state.pristine)).toEqual(true)
     expect(form.getFormState(state => state.initialized)).toEqual(true)
     expect(aa.getState(state => state.value)).toEqual(testValues.aa)
     expect(bb.getState(state => state.value)).toEqual(testValues.bb)
@@ -106,24 +110,19 @@ describe('createForm', () => {
     })
     expect(form.getFormState(state => state.values)).toEqual(testValues)
     expect(form.getFormState(state => state.initialValues)).toEqual(testValues)
-    expect(form.getFormState(state => state.pristine)).toEqual(true)
     expect(form.getFormState(state => state.initialized)).toEqual(true)
     expect(form.getFormGraph()).toMatchSnapshot()
-  })
-
-  const sleep = (d=1000)=>new Promise((resolve)=>{
-    setTimeout(()=>{
-      resolve()
-    },d)
   })
 
   test('invalid initialValue will not trigger validate', async () => {
     const form = createForm()
     const field = form.registerField({
       name: 'aa',
-      rules:[{
-        required:true
-      }]
+      rules: [
+        {
+          required: true
+        }
+      ]
     })
     const mutators = form.createMutators(field)
     field.subscribe(() => {
@@ -135,7 +134,7 @@ describe('createForm', () => {
       }
     })
     await sleep(10)
-    expect(field.getState(state=>state.errors).length).toEqual(1)
+    expect(field.getState(state => state.errors).length).toEqual(1)
   })
 
   test('lifecycles', () => {
@@ -414,6 +413,31 @@ describe('reset', () => {
     expect(form.getFormState(state => state.values)).toEqual({ aa: { bb: [] } })
     expect(form.getFormState(state => state.initialValues)).toEqual({})
   })
+
+  test('date reset', () => {
+    const form = createForm({
+      values: {},
+      initialValues: {},
+      onChange: values => {
+        console.log(values)
+      }
+    })
+
+    const aa = form.registerField({
+      path: 'aa',
+      initialValue: ''
+    })
+
+    aa.setState(state => {
+      state.value = new Date()
+    })
+
+    form.reset()
+    expect(
+      form.getFormState(state => state.values.aa)
+    ).toBe('')
+  })
+  
 })
 
 describe('clearErrors', () => {
@@ -716,12 +740,13 @@ describe('setFormState', () => {
     expect(form.getFormState()).toEqual({
       displayName: 'FormState',
       pristine: isEqual(values, initialValues),
-      valid: !invalid,
-      invalid: invalid,
+      valid: true,
+      invalid: false,
       loading: validating,
       validating: validating,
       submitting: true,
       initialized: false,
+      modified: true,
       editable: false,
       errors,
       warnings,
@@ -859,13 +884,13 @@ describe('setFieldState', () => {
     // visible为false或者已卸载的组件无法修改value
     form.setFieldState('a', state => (state.visible = false))
     form.setFieldState('a', state => (state.value = [4, 5, 6]))
-    expect(form.getFieldState('a', state => state.value)).toEqual(arr)
+    expect(form.getFieldState('a', state => state.value)).toEqual([4,5,6])
     form.setFieldState('a', state => {
       state.visible = true
       state.unmounted = true
     })
     form.setFieldState('a', state => (state.value = [4, 5, 6]))
-    expect(form.getFieldState('a', state => state.value)).toEqual(arr)
+    expect(form.getFieldState('a', state => state.value)).toEqual([4,5,6])
   })
 
   test('mount and unmount', () => {
@@ -1587,7 +1612,7 @@ describe('major sences', () => {
     expect(form.getFormGraph()).toMatchSnapshot()
   })
 
-  test('visible onChange', () => {
+  test('visible onChange', async () => {
     const onChangeHandler = jest.fn()
     const form = createForm({
       initialValues: {
@@ -1598,9 +1623,13 @@ describe('major sences', () => {
     form.registerField({
       name: 'aa'
     })
+    form.setFormState(state=>{
+      state.mounted = true
+    })
     form.setFieldState('aa', state => {
       state.visible = false
     })
+    await sleep(10)
     expect(onChangeHandler).toBeCalledTimes(1)
   })
 

@@ -5,12 +5,15 @@ import {
   isNum,
   isArr,
   clone,
+  log,
   isValid,
+  isEmpty,
   FormPath,
   FormPathPattern,
+  BigData,
   each,
   isObj,
-  scheduler
+  isPlainObj
 } from '@formily/shared'
 import {
   FormValidator,
@@ -29,7 +32,6 @@ import {
   IFormCreatorOptions,
   IFieldStateProps,
   IVirtualFieldStateProps,
-  IForm,
   IFormSubmitResult,
   IFormValidateResult,
   IFormResetOptions,
@@ -47,9 +49,18 @@ import {
 export * from './shared/lifecycle'
 export * from './types'
 
-export function createForm<FieldProps, VirtualFieldProps>(
-  options: IFormCreatorOptions = {}
-): IForm {
+declare global {
+  namespace FormilyCore {
+    export interface FieldProps {
+      [key: string]: any
+    }
+    export interface VirtualFieldProps {
+      [key: string]: any
+    }
+  }
+}
+
+export function createForm(options: IFormCreatorOptions = {}) {
   function onGraphChange({ type, payload }) {
     heart.publish(LifeCycleTypes.ON_FORM_GRAPH_CHANGE, graph)
     if (type === 'GRAPH_NODE_WILL_UNMOUNT') {
@@ -84,6 +95,7 @@ export function createForm<FieldProps, VirtualFieldProps>(
         }
       })
     }
+
     if (removed) return
     if (!isEqual(value, state.value)) {
       state.value = value
@@ -91,10 +103,11 @@ export function createForm<FieldProps, VirtualFieldProps>(
   }
 
   function syncFieldIntialValues(state: IFieldState) {
+    if (state.name === '') return
     const initialValue = getFormInitialValuesIn(state.name)
     if (!isEqual(initialValue, state.initialValue)) {
       state.initialValue = initialValue
-      if (!isValid(state.value)) {
+      if (!isValid(state.value) || isEmpty(state.value)) {
         state.value = initialValue
       } else if (
         /array/gi.test(state.dataType) &&
@@ -104,6 +117,25 @@ export function createForm<FieldProps, VirtualFieldProps>(
         state.value = initialValue
       }
     }
+  }
+
+  function notifyFormValuesChange() {
+    if (
+      isFn(options.onChange) &&
+      state.state.mounted &&
+      !state.state.unmounted
+    ) {
+      clearTimeout(env.onChangeTimer)
+      env.onChangeTimer = setTimeout(() => {
+        if (state.state.unmounted) return
+        options.onChange(clone(getFormValuesIn('')))
+      })
+    }
+    heart.publish(LifeCycleTypes.ON_FORM_VALUES_CHANGE, state)
+  }
+
+  function notifyFormInitialValuesChange() {
+    heart.publish(LifeCycleTypes.ON_FORM_INITIAL_VALUES_CHANGE, state)
   }
 
   function onFormChange(published: IFormState) {
@@ -118,56 +150,37 @@ export function createForm<FieldProps, VirtualFieldProps>(
       const updateFields = (field: IField | IVirtualField) => {
         if (isField(field)) {
           field.setState(state => {
-            if (state.visible || state.unmounted) {
-              if (valuesChanged) {
-                syncFieldValues(state)
-              }
-              if (initialValuesChanged) {
-                syncFieldIntialValues(state)
-              }
-            } else {
-              //缓存变化，等字段重新显示的时候再执行
-              if (valuesChanged) {
-                env.hiddenPendingFields[state.name] =
-                  env.hiddenPendingFields[state.name] || {}
-                env.hiddenPendingFields[state.name].values = true
-              }
-              if (initialValuesChanged) {
-                env.hiddenPendingFields[state.name] =
-                  env.hiddenPendingFields[state.name] || {}
-                env.hiddenPendingFields[state.name].initialValues = true
-              }
+            if (valuesChanged) {
+              syncFieldValues(state)
+            }
+            if (initialValuesChanged) {
+              syncFieldIntialValues(state)
             }
           })
         }
       }
       if (valuesChanged || initialValuesChanged) {
-        if (!env.leadingStage) {
-          const userUpdateFieldPath =
-            env.userUpdateFields[env.userUpdateFields.length - 1]
-          /*
-           * 考虑初始化的时候还没生成节点树
-           * 两种数据同步策略，
-           * 1. 精确更新的时候(mutators/setFieldState)，只遍历父节点与子节点，同时父节点静默处理，子节点通知渲染
-           * 2. setFormState批量更新的时候，是会遍历所有节点，同时所有节点只要有变化就会被通知
-           */
-          if (userUpdateFieldPath && graph.get(userUpdateFieldPath)) {
-            graph.eachParentAndChildren(userUpdateFieldPath, updateFields)
-          } else {
+        /*
+         * 考虑初始化的时候还没生成节点树
+         * 2种数据同步策略，
+         * 1. 精确同步，基于操作节点，静默更新父子节点，同时不会回流onFormChange
+         * 2. 批量同步，但是会采用异步节流方式合并同步任务
+         */
+        if (graph.size > 20) {
+          clearTimeout(env.syncFormStateTimer)
+          env.syncFormStateTimer = setTimeout(() => {
             graph.eachChildren(updateFields)
-          }
+          })
         } else {
           graph.eachChildren(updateFields)
         }
+        // }
       }
       if (valuesChanged) {
-        if (isFn(options.onChange)) {
-          options.onChange(clone(published.values))
-        }
-        heart.publish(LifeCycleTypes.ON_FORM_VALUES_CHANGE, state)
+        notifyFormValuesChange()
       }
       if (initialValuesChanged) {
-        heart.publish(LifeCycleTypes.ON_FORM_INITIAL_VALUES_CHANGE, state)
+        notifyFormInitialValuesChange()
       }
     }
 
@@ -193,9 +206,11 @@ export function createForm<FieldProps, VirtualFieldProps>(
 
   function updateRecoverableShownState(
     parentState:
-      | IVirtualFieldState<VirtualFieldProps>
-      | IFieldState<FieldProps>,
-    childState: IVirtualFieldState<VirtualFieldProps> | IFieldState<FieldProps>,
+      | IVirtualFieldState<FormilyCore.VirtualFieldProps>
+      | IFieldState<FormilyCore.FieldProps>,
+    childState:
+      | IVirtualFieldState<FormilyCore.VirtualFieldProps>
+      | IFieldState<FormilyCore.FieldProps>,
     name: 'visible' | 'display'
   ) {
     const lastShownState = env.lastShownStates[childState.path]
@@ -221,7 +236,35 @@ export function createForm<FieldProps, VirtualFieldProps>(
   }
 
   function onFieldChange({ field, path }) {
-    return (published: IFieldState<FieldProps>) => {
+    function notifyTreeFromValues() {
+      field.setState(syncFieldValues)
+      graph.eachParent(path, (field: IField) => {
+        if (isField(field)) {
+          field.setState(syncFieldValues, true)
+        }
+      })
+      graph.eachChildren(path, (field: IField) => {
+        if (isField(field)) {
+          field.setState(syncFieldValues)
+        }
+      })
+      notifyFormValuesChange()
+    }
+    function notifyTreeFromInitialValues() {
+      field.setState(syncFieldIntialValues)
+      graph.eachParent(path, (field: IField) => {
+        if (isField(field)) {
+          field.setState(syncFieldIntialValues, true)
+        }
+      })
+      graph.eachChildren(path, (field: IField) => {
+        if (isField(field)) {
+          field.setState(syncFieldIntialValues)
+        }
+      })
+      notifyFormInitialValuesChange()
+    }
+    return (published: IFieldState<FormilyCore.FieldProps>) => {
       const valueChanged = field.isDirty('value')
       const initialValueChanged = field.isDirty('initialValue')
       const visibleChanged = field.isDirty('visible')
@@ -231,39 +274,24 @@ export function createForm<FieldProps, VirtualFieldProps>(
       const initializedChanged = field.isDirty('initialized')
       const warningsChanged = field.isDirty('warnings')
       const errorsChanged = field.isDirty('errors')
-      const userUpdateFieldPath =
-        env.userUpdateFields[env.userUpdateFields.length - 1]
-
-      const syncField = () => {
-        if (env.hiddenPendingFields[published.name]) {
-          field.setState((state: IFieldState) => {
-            if (env.hiddenPendingFields[state.name].values) {
-              syncFieldValues(state)
-            }
-            if (env.hiddenPendingFields[state.name].initialValues) {
-              syncFieldIntialValues(state)
-            }
-            delete env.hiddenPendingFields[state.name]
-          })
-        }
-      }
-
-      const notifyFormValuesChange = () => {
-        if (isFn(options.onChange)) {
-          options.onChange(state.getSourceState(state => clone(state.values)))
-        }
-        heart.publish(LifeCycleTypes.ON_FORM_VALUES_CHANGE, state)
-      }
+      const editableChanged = field.isDirty('editable')
 
       if (initializedChanged) {
         heart.publish(LifeCycleTypes.ON_FIELD_INIT, field)
         const isEmptyValue = !isValid(published.value)
         const isEmptyInitialValue = !isValid(published.initialValue)
         if (isEmptyValue || isEmptyInitialValue) {
-          field.setSourceState((state: IFieldState<FieldProps>) => {
-            if (isEmptyValue) state.value = getFormValuesIn(state.name)
-            if (isEmptyInitialValue)
-              state.initialValue = getFormInitialValuesIn(state.name)
+          field.setSourceState((state: IFieldState<FormilyCore.FieldProps>) => {
+            if (isEmptyValue) {
+              const formValue = getFormValuesIn(state.name)
+              state.value = isValid(formValue) ? formValue : state.value
+            }
+            if (isEmptyInitialValue) {
+              const formInitialValue = getFormInitialValuesIn(state.name)
+              state.initialValue = isValid(formInitialValue)
+                ? formInitialValue
+                : state.initialValue
+            }
           })
         }
       }
@@ -271,33 +299,45 @@ export function createForm<FieldProps, VirtualFieldProps>(
         published.visible == false || published.unmounted === true
       if (valueChanged) {
         if (!wasHidden) {
-          userUpdating(field, () => {
-            setFormValuesIn(path, published.value)
-          })
+          setFormValuesIn(path, published.value, true)
+          notifyTreeFromValues()
         }
         heart.publish(LifeCycleTypes.ON_FIELD_VALUE_CHANGE, field)
       }
       if (initialValueChanged) {
         if (!wasHidden) {
-          setFormInitialValuesIn(path, published.initialValue)
+          setFormInitialValuesIn(path, published.initialValue, true)
+          notifyTreeFromInitialValues()
         }
         heart.publish(LifeCycleTypes.ON_FIELD_INITIAL_VALUE_CHANGE, field)
       }
       if (displayChanged || visibleChanged) {
         if (visibleChanged) {
-          userUpdating(field, () => {
-            if (!published.visible) {
-              deleteFormValuesIn(path, true)
-              //考虑到隐藏删值，不应该同步子树，但是需要触发表单变化事件
-              notifyFormValuesChange()
-            } else {
-              setFormValuesIn(path, published.value)
-              syncField()
+          if (!published.visible) {
+            if (isValid(published.value)) {
+              field.setSourceState(
+                (state: IFieldState<FormilyCore.FieldProps>) => {
+                  state.visibleCacheValue = published.value
+                }
+              )
             }
-          })
+            deleteFormValuesIn(path)
+            notifyTreeFromValues()
+          } else {
+            if (!existFormValuesIn(path)) {
+              setFormValuesIn(
+                path,
+                isValid(published.visibleCacheValue)
+                  ? published.visibleCacheValue
+                  : published.initialValue,
+                true
+              )
+              notifyTreeFromValues()
+            }
+          }
         }
         graph.eachChildren(path, childState => {
-          childState.setState((state: IFieldState<FieldProps>) => {
+          childState.setState((state: IFieldState<FormilyCore.FieldProps>) => {
             if (visibleChanged) {
               updateRecoverableShownState(published, state, 'visible')
             }
@@ -309,18 +349,31 @@ export function createForm<FieldProps, VirtualFieldProps>(
       }
       if (
         unmountedChanged &&
-        (published.display !== false || published.visible === false)
+        (published.display !== false || published.visible === false) &&
+        published.unmountRemoveValue === true
       ) {
-        userUpdating(field, () => {
-          if (published.unmounted) {
-            deleteFormValuesIn(path, true)
-            //考虑到隐藏删值，不应该同步子树，但是需要触发表单变化事件
-            notifyFormValuesChange()
-          } else {
-            setFormValuesIn(path, published.value)
-            syncField()
+        if (published.unmounted) {
+          if (isValid(published.value)) {
+            field.setSourceState(
+              (state: IFieldState<FormilyCore.FieldProps>) => {
+                state.visibleCacheValue = published.value
+              }
+            )
           }
-        })
+          deleteFormValuesIn(path, true)
+          notifyTreeFromValues()
+        } else {
+          if (!existFormValuesIn(path)) {
+            setFormValuesIn(
+              path,
+              isValid(published.visibleCacheValue)
+                ? published.visibleCacheValue
+                : published.initialValue,
+              true
+            )
+            notifyTreeFromValues()
+          }
+        }
         heart.publish(LifeCycleTypes.ON_FIELD_UNMOUNT, field)
       }
       if (mountedChanged && published.mounted) {
@@ -334,20 +387,23 @@ export function createForm<FieldProps, VirtualFieldProps>(
       if (warningsChanged) {
         syncFormMessages('warnings', published)
       }
-      heart.publish(LifeCycleTypes.ON_FIELD_CHANGE, field)
-      if (userUpdateFieldPath && !env.leadingStage) {
-        if (FormPath.parse(path).match(userUpdateFieldPath)) {
-          return
-        }
-        if (FormPath.parse(userUpdateFieldPath).includes(path)) {
-          return false
-        }
+
+      if (
+        unmountedChanged ||
+        visibleChanged ||
+        displayChanged ||
+        editableChanged
+      ) {
+        //fix #682
+        resetFormMessages(published)
       }
+
+      heart.publish(LifeCycleTypes.ON_FIELD_CHANGE, field)
     }
   }
 
   function onVirtualFieldChange({ field, path }) {
-    return (published: IVirtualFieldState<VirtualFieldProps>) => {
+    return (published: IVirtualFieldState<FormilyCore.VirtualFieldProps>) => {
       const visibleChanged = field.isDirty('visible')
       const displayChanged = field.isDirty('display')
       const mountedChanged = field.isDirty('mounted')
@@ -360,7 +416,7 @@ export function createForm<FieldProps, VirtualFieldProps>(
       if (visibleChanged || displayChanged) {
         graph.eachChildren(path, childState => {
           childState.setState(
-            (state: IVirtualFieldState<VirtualFieldProps>) => {
+            (state: IVirtualFieldState<FormilyCore.VirtualFieldProps>) => {
               if (visibleChanged) {
                 updateRecoverableShownState(published, state, 'visible')
               }
@@ -389,8 +445,8 @@ export function createForm<FieldProps, VirtualFieldProps>(
     computeState,
     useDirty
   }: IVirtualFieldStateProps): IVirtualField {
-    let nodePath = FormPath.parse(path || name)
-    let dataPath = transformDataPath(nodePath)
+    const nodePath = FormPath.parse(path || name)
+    const dataPath = transformDataPath(nodePath)
     let field: IVirtualField
     const createField = (field?: IVirtualField) => {
       const alreadyHaveField = !!field
@@ -409,18 +465,23 @@ export function createForm<FieldProps, VirtualFieldProps>(
       if (!alreadyHaveField) {
         graph.appendNode(nodePath, field)
       }
-      field.batch(() => {
-        field.setState((state: IVirtualFieldState<VirtualFieldProps>) => {
-          state.initialized = true
-          state.props = props
-          if (isValid(visible)) {
-            state.visible = visible
-          }
-          if (isValid(display)) {
-            state.display = display
-          }
+      heart.batch(() => {
+        //fix #766
+        field.batch(() => {
+          field.setState(
+            (state: IVirtualFieldState<FormilyCore.VirtualFieldProps>) => {
+              state.initialized = true
+              state.props = props
+              if (isValid(visible)) {
+                state.visible = visible
+              }
+              if (isValid(display)) {
+                state.display = display
+              }
+            }
+          )
+          batchRunTaskQueue(field, nodePath)
         })
-        batchRunTaskQueue(field, nodePath)
       })
       return field
     }
@@ -449,11 +510,12 @@ export function createForm<FieldProps, VirtualFieldProps>(
     computeState,
     dataType,
     useDirty,
+    unmountRemoveValue,
     props
   }: Exclude<IFieldStateProps, 'dataPath' | 'nodePath'>): IField {
     let field: IField
-    let nodePath = FormPath.parse(path || name)
-    let dataPath = transformDataPath(nodePath)
+    const nodePath = FormPath.parse(path || name)
+    const dataPath = transformDataPath(nodePath)
     const createField = (field?: IField) => {
       const alreadyHaveField = !!field
       field =
@@ -472,49 +534,65 @@ export function createForm<FieldProps, VirtualFieldProps>(
       if (!alreadyHaveField) {
         graph.appendNode(nodePath, field)
       }
-      field.batch(() => {
-        field.setState((state: IFieldState<FieldProps>) => {
-          const formValue = getFormValuesIn(dataPath)
-          const formInitialValue = getFormInitialValuesIn(dataPath)
-          if (isValid(value)) {
-            // value > formValue > initialValue
-            state.value = value
-          } else {
-            state.value = existFormValuesIn(dataPath) ? formValue : initialValue
-          }
-          // initialValue > formInitialValue
-          state.initialValue = isValid(initialValue)
-            ? initialValue
-            : formInitialValue
-          if (isValid(visible)) {
-            state.visible = visible
-          }
-          if (isValid(display)) {
-            state.display = display
-          }
-          if (isValid(props)) {
-            state.props = props
-          }
-          if (isValid(required)) {
-            state.required = required
-          }
-          if (isValid(rules)) {
-            state.rules = rules
-          }
-          if (isValid(editable)) {
-            state.selfEditable = editable
-          }
-          if (isValid(options.editable)) {
-            state.formEditable = options.editable
-          }
-          state.initialized = true
+
+      heart.batch(() => {
+        field.batch(() => {
+          field.setState((state: IFieldState<FormilyCore.FieldProps>) => {
+            const formValue = getFormValuesIn(state.name)
+            const formInitialValue = getFormInitialValuesIn(state.name)
+
+            if (isValid(initialValue)) {
+              state.initialValue = initialValue
+            } else if (isValid(formInitialValue)) {
+              state.initialValue = formInitialValue
+            }
+
+            if (isValid(unmountRemoveValue)) {
+              state.unmountRemoveValue = unmountRemoveValue
+            }
+
+            if (isValid(value)) {
+              // value > formValue > initialValue
+              state.value = value
+            } else if (existFormValuesIn(state.name) || !isEmpty(formValue)) {
+              //to resolve empty array checker
+              state.value = formValue
+            } else if (isValid(initialValue)) {
+              state.value = initialValue
+            }
+
+            if (isValid(visible)) {
+              state.visible = visible
+            }
+            if (isValid(display)) {
+              state.display = display
+            }
+            if (isValid(props)) {
+              state.props = props
+            }
+            if (isValid(required)) {
+              state.required = required
+            }
+            if (isValid(rules)) {
+              state.rules = rules as any
+            }
+            if (isValid(editable)) {
+              state.selfEditable = editable
+            }
+            if (isValid(options.editable)) {
+              state.formEditable = options.editable
+            }
+            state.initialized = true
+          })
+          batchRunTaskQueue(field, nodePath)
         })
-        batchRunTaskQueue(field, nodePath)
       })
       validator.register(nodePath, validate => {
         const {
           value,
           rules,
+          errors,
+          warnings,
           editable,
           visible,
           unmounted,
@@ -525,7 +603,9 @@ export function createForm<FieldProps, VirtualFieldProps>(
           editable === false ||
           visible === false ||
           unmounted === true ||
-          display === false
+          display === false ||
+          (field as any).disabledValidate ||
+          (rules.length === 0 && errors.length === 0 && warnings.length === 0)
         )
           return validate(value, [])
         clearTimeout((field as any).validateTimer)
@@ -538,20 +618,16 @@ export function createForm<FieldProps, VirtualFieldProps>(
         return validate(value, rules).then(({ errors, warnings }) => {
           clearTimeout((field as any).validateTimer)
           return new Promise(resolve => {
-            const syncState = () => {
-              field.setState((state: IFieldState<FieldProps>) => {
-                state.validating = false
-                state.ruleErrors = errors
-                state.ruleWarnings = warnings
-              })
-              heart.publish(LifeCycleTypes.ON_FIELD_VALIDATE_END, field)
-              resolve({ errors, warnings })
-            }
-            if (graph.size < 100) {
-              syncState()
-            } else {
-              applyWithScheduler(syncState)
-            }
+            field.setState((state: IFieldState<FormilyCore.FieldProps>) => {
+              state.validating = false
+              state.ruleErrors = errors
+              state.ruleWarnings = warnings
+            })
+            heart.publish(LifeCycleTypes.ON_FIELD_VALIDATE_END, field)
+            resolve({
+              errors,
+              warnings
+            })
           })
         })
       })
@@ -567,6 +643,42 @@ export function createForm<FieldProps, VirtualFieldProps>(
       field = createField()
     }
     return field
+  }
+
+  function resetFormMessages(fieldState: IFieldState) {
+    const { path, visible, display, unmounted, editable } = fieldState
+    if (
+      editable === false ||
+      visible === false ||
+      unmounted === true ||
+      display === false
+    ) {
+      state.setSourceState(state => {
+        state.errors = state.errors || []
+        state.warnings = state.warnings || []
+        state.errors = state.errors.reduce((buf: any, item: any) => {
+          if (item.path === path) {
+            return buf
+          } else {
+            return buf.concat(item)
+          }
+        }, [])
+        state.warnings = state.warnings.reduce((buf: any, item: any) => {
+          if (item.path === path) {
+            return buf
+          } else {
+            return buf.concat(item)
+          }
+        }, [])
+        if (state.errors.length) {
+          state.invalid = true
+          state.valid = false
+        } else {
+          state.invalid = false
+          state.valid = true
+        }
+      })
+    }
   }
 
   //实时同步Form Messages
@@ -621,14 +733,22 @@ export function createForm<FieldProps, VirtualFieldProps>(
     value: any,
     silent?: boolean
   ) {
-    state.setState(state => {
+    const method = silent ? 'setSourceState' : 'setState'
+    state[method](state => {
       FormPath.setIn(state[key], transformDataPath(path), value)
+      if (key === 'values') {
+        state.modified = true
+      }
     }, silent)
   }
 
   function deleteFormIn(path: FormPathPattern, key: string, silent?: boolean) {
-    state.setState(state => {
+    const method = silent ? 'setSourceState' : 'setState'
+    state[method](state => {
       FormPath.deleteIn(state[key], transformDataPath(path))
+      if (key === 'values') {
+        state.modified = true
+      }
     }, silent)
   }
 
@@ -671,15 +791,26 @@ export function createForm<FieldProps, VirtualFieldProps>(
   function getFormInitialValuesIn(path: FormPathPattern) {
     return getFormIn(path, 'initialValues')
   }
-
-  function createMutators(field: IField) {
-    if (!isField(field)) {
-      throw new Error(
-        'The `createMutators` can only accept FieldState instance.'
-      )
+  /**
+   *
+   * @param input IField | FormPathPattern
+   */
+  function createMutators(input: any) {
+    let field: IField
+    if (!isField(input)) {
+      const selected = graph.select(input)
+      if (selected) {
+        field = selected
+      } else {
+        throw new Error(
+          'The `createMutators` can only accept FieldState instance or FormPathPattern.'
+        )
+      }
+    } else {
+      field = input
     }
     function setValue(...values: any[]) {
-      field.setState((state: IFieldState<FieldProps>) => {
+      field.setState((state: IFieldState<FormilyCore.FieldProps>) => {
         state.value = values[0]
         state.values = values
       })
@@ -691,26 +822,16 @@ export function createForm<FieldProps, VirtualFieldProps>(
       const nodePath = field.getSourceState(state => state.path)
       if (isValid(key)) {
         const childNodePath = FormPath.parse(nodePath).concat(key)
-        env.userUpdateFields.push(nodePath)
         env.removeNodes[childNodePath.toString()] = true
         deleteFormValuesIn(childNodePath)
         field.notify(field.getState())
-        env.userUpdateFields.pop()
       } else {
         const parent = graph.selectParent(nodePath)
         env.removeNodes[nodePath.toString()] = true
-        const parentNodePath =
-          parent && parent.getSourceState(state => state.path)
-        if (parentNodePath) {
-          env.userUpdateFields.push(parentNodePath)
-        } else {
-          env.userUpdateFields.push(nodePath)
-        }
         deleteFormValuesIn(nodePath)
         if (parent) {
           parent.notify(parent.getState())
         }
-        env.userUpdateFields.pop()
       }
       heart.publish(LifeCycleTypes.ON_FIELD_VALUE_CHANGE, field)
       heart.publish(LifeCycleTypes.ON_FIELD_INPUT_CHANGE, field)
@@ -720,18 +841,68 @@ export function createForm<FieldProps, VirtualFieldProps>(
     function getValue() {
       return field.getSourceState(state => state.value)
     }
-    return {
+
+    function onGraphChange(callback: () => void) {
+      let timer = null
+      const id = graph.subscribe(() => {
+        clearTimeout(timer)
+        timer = setTimeout(() => {
+          graph.unsubscribe(id)
+          callback()
+        })
+      })
+    }
+
+    //1. 无法自动交换通过移动来新增删除子列表元素的状态
+    //2. 暂时不支持通过setFieldState修改值场景的状态交换
+    function swapState($from: number, $to: number) {
+      const keys: string[] = ['initialValue', 'visibleCacheValue', 'values']
+      const arrayName = field.getSourceState(state => state.name)
+      const fromFieldsName = `${arrayName}.${$from}.*`
+      const toFieldsName = `${arrayName}.${$to}.*`
+      const cache = {}
+      const calculatePath = (name: string, $from: number, $to: number) => {
+        return name.replace(`${arrayName}.${$from}`, `${arrayName}.${$to}`)
+      }
+      graph.select(fromFieldsName, field => {
+        field.setSourceState((state: IFieldState) => {
+          const targetState =
+            getFieldState(calculatePath(state.name, $from, $to)) || {}
+          keys.forEach(key => {
+            cache[state.name] = cache[state.name] || {}
+            cache[state.name][key] = state[key]
+            state[key] = targetState && targetState[key]
+          })
+        })
+      })
+      graph.select(toFieldsName, field => {
+        field.setSourceState((state: IFieldState) => {
+          const cacheState = cache[calculatePath(state.name, $to, $from)] || {}
+          keys.forEach(key => {
+            state[key] = cacheState[key]
+          })
+        })
+      })
+    }
+
+    function swapAfterState(start: number, arrayLength: number, step = 1) {
+      for (let i = arrayLength - 1; i >= start + 1; i -= step) {
+        swapState(i, i - 1)
+      }
+    }
+
+    const mutators = {
       change(...values: any[]) {
         setValue(...values)
         return values[0]
       },
       focus() {
-        field.setState((state: IFieldState<FieldProps>) => {
+        field.setState((state: IFieldState<FormilyCore.FieldProps>) => {
           state.active = true
         })
       },
       blur() {
-        field.setState((state: IFieldState<FieldProps>) => {
+        field.setState((state: IFieldState<FormilyCore.FieldProps>) => {
           state.active = false
           state.visited = true
         })
@@ -752,13 +923,20 @@ export function createForm<FieldProps, VirtualFieldProps>(
         const arr = toArr(getValue()).slice()
         arr.splice(index, 0, value)
         setValue(arr)
+        onGraphChange(() => {
+          swapAfterState(index, arr.length)
+        })
         return arr
       },
       remove(index?: number | string) {
         let val = getValue()
         if (isNum(index) && isArr(val)) {
           val = [].concat(val)
+          const lastIndex = val.length - 1
           val.splice(index, 1)
+          if (index < lastIndex) {
+            swapState(Number(index), Number(index) + 1)
+          }
           setValue(val)
         } else {
           removeValue(index)
@@ -768,21 +946,19 @@ export function createForm<FieldProps, VirtualFieldProps>(
         const newPath = field.getSourceState(state =>
           FormPath.parse(state.path)
         )
-        let val = getValue()
+        const val = getValue()
         return (isValid(index) ? newPath.concat(index) : newPath).existIn(
           val,
           newPath
         )
       },
       unshift(value: any) {
-        const arr = toArr(getValue()).slice()
-        arr.unshift(value)
-        setValue(arr)
-        return arr
+        return mutators.insert(0, value)
       },
       shift() {
         const arr = toArr(getValue()).slice()
         arr.shift()
+        swapState(0, 1)
         setValue(arr)
         return arr
       },
@@ -791,47 +967,44 @@ export function createForm<FieldProps, VirtualFieldProps>(
         const item = arr[$from]
         arr.splice($from, 1)
         arr.splice($to, 0, item)
+        swapState($from, $to)
         setValue(arr)
         return arr
       },
       moveUp(index: number) {
-        const arr = toArr(getValue()).slice()
-        const item = arr[index]
-        const len = arr.length
-        arr.splice(index, 1)
-        arr.splice(index - 1 < 0 ? len - 1 : index - 1, 0, item)
-        setValue(arr)
-        return arr
+        const len = toArr(getValue()).length
+        return mutators.move(index, index - 1 < 0 ? len - 1 : index - 1)
       },
       moveDown(index: number) {
-        const arr = toArr(getValue()).slice()
-        const item = arr[index]
-        const len = arr.length
-        arr.splice(index, 1)
-        arr.splice(index + 1 > len ? 0 : index + 1, 0, item)
-        setValue(arr)
-        return arr
+        const len = toArr(getValue()).length
+        return mutators.move(index, index + 1 > len ? 0 : index + 1)
       },
       validate(opts?: IFormExtendedValidateFieldOptions) {
         return validate(
           field.getSourceState(state => state.path),
-          opts
+          {
+            ...opts,
+            hostRendering: false
+          }
         )
       }
     }
+    return mutators
   }
 
   function clearErrors(pattern: FormPathPattern = '*') {
     // 1. 指定路径或全部子路径清理
-    graph.eachChildren('', pattern, field => {
-      if (isField(field)) {
-        field.setState(state => {
-          state.ruleErrors = []
-          state.ruleWarnings = []
-          state.effectErrors = []
-          state.effectWarnings = []
-        })
-      }
+    hostUpdate(() => {
+      graph.eachChildren('', pattern, field => {
+        if (isField(field)) {
+          field.setState(state => {
+            state.ruleErrors = []
+            state.ruleWarnings = []
+            state.effectErrors = []
+            state.effectWarnings = []
+          })
+        }
+      })
     })
   }
 
@@ -841,44 +1014,48 @@ export function createForm<FieldProps, VirtualFieldProps>(
     validate = true,
     clearInitialValue = false
   }: IFormResetOptions = {}): Promise<void | IFormValidateResult> {
-    graph.eachChildren('', selector, field => {
-      field.setState((state: IFieldState<FieldProps>) => {
-        state.modified = false
-        state.ruleErrors = []
-        state.ruleWarnings = []
-        state.effectErrors = []
-        state.effectWarnings = []
-        if (clearInitialValue) {
-          state.initialValue = undefined
-        }
-        // forceClear仅对设置initialValues的情况下有意义
-        if (forceClear || !isValid(state.initialValue)) {
-          if (isArr(state.value)) {
-            state.value = []
-          } else if (!isObj(state.value)) {
-            state.value = undefined
+    hostUpdate(() => {
+      graph.eachChildren('', selector, (field: IField) => {
+        ;(field as any).disabledValidate = true
+        field.setState((state: IFieldState<FormilyCore.FieldProps>) => {
+          state.modified = false
+          state.ruleErrors = []
+          state.ruleWarnings = []
+          state.effectErrors = []
+          state.effectWarnings = []
+          if (clearInitialValue) {
+            state.initialValue = undefined
           }
-        } else {
-          const value = clone(state.initialValue)
-          if (isArr(state.value)) {
-            if (isArr(value)) {
-              state.value = value
-            } else {
+          // forceClear仅对设置initialValues的情况下有意义
+          if (forceClear || !isValid(state.initialValue)) {
+            if (isArr(state.value)) {
               state.value = []
-            }
-          } else if (isObj(state.value)) {
-            if (isObj(value)) {
-              state.value = value
-            } else {
-              state.value = {}
+            } else if (!isObj(state.value)) {
+              state.value = undefined
             }
           } else {
-            state.value = value
+            const value = clone(state.initialValue)
+            if (isArr(state.value)) {
+              if (isArr(value)) {
+                state.value = value
+              } else {
+                state.value = []
+              }
+            } else if (isPlainObj(state.value)) {
+              if (isPlainObj(value)) {
+                state.value = value
+              } else {
+                state.value = {}
+              }
+            } else {
+              state.value = value
+            }
           }
-        }
+        })
+        ;(field as any).disabledValidate = false
       })
     })
-    if (isFn(options.onReset)) {
+    if (isFn(options.onReset) && !state.state.unmounted) {
       options.onReset()
     }
     heart.publish(LifeCycleTypes.ON_FORM_RESET, state)
@@ -904,7 +1081,7 @@ export function createForm<FieldProps, VirtualFieldProps>(
     env.submittingTask = async () => {
       // 增加onFormSubmitValidateStart来明确submit引起的校验开始了
       heart.publish(LifeCycleTypes.ON_FORM_SUBMIT_VALIDATE_START, state)
-      await validate('', { throwErrors: false })
+      await validate('', { throwErrors: false, hostRendering: true })
       const validated: IFormValidateResult = state.getState(state => ({
         errors: state.errors,
         warnings: state.warnings
@@ -920,7 +1097,7 @@ export function createForm<FieldProps, VirtualFieldProps>(
         // 增加onFormSubmitValidateFailed来明确结束submit的类型
         heart.publish(LifeCycleTypes.ON_FORM_SUBMIT_VALIDATE_FAILED, state)
         heart.publish(LifeCycleTypes.ON_FORM_SUBMIT_END, state)
-        if (isFn(options.onValidateFailed)) {
+        if (isFn(options.onValidateFailed) && !state.state.unmounted) {
           options.onValidateFailed(validated)
         }
 
@@ -934,10 +1111,12 @@ export function createForm<FieldProps, VirtualFieldProps>(
 
       let payload,
         values = state.getState(state => clone(state.values))
-      if (isFn(onSubmit)) {
+      if (isFn(onSubmit) && !state.state.unmounted) {
         try {
           payload = await Promise.resolve(onSubmit(values))
+          heart.publish(LifeCycleTypes.ON_FORM_ON_SUBMIT_SUCCESS, payload)
         } catch (e) {
+          heart.publish(LifeCycleTypes.ON_FORM_ON_SUBMIT_FAILED, e)
           new Promise(() => {
             throw e
           })
@@ -962,7 +1141,7 @@ export function createForm<FieldProps, VirtualFieldProps>(
     path?: FormPathPattern,
     opts?: IFormExtendedValidateFieldOptions
   ): Promise<IFormValidateResult> {
-    const { throwErrors = true } = opts || {}
+    const { throwErrors = true, hostRendering } = opts || {}
     if (!state.getState(state => state.validating)) {
       state.setSourceState(state => {
         state.validating = true
@@ -975,13 +1154,17 @@ export function createForm<FieldProps, VirtualFieldProps>(
     }
 
     heart.publish(LifeCycleTypes.ON_FORM_VALIDATE_START, state)
+    if (graph.size > 100 && hostRendering) env.hostRendering = true
     const payload = await validator.validate(path, opts)
     clearTimeout(env.validateTimer)
     state.setState(state => {
       state.validating = false
     })
     heart.publish(LifeCycleTypes.ON_FORM_VALIDATE_END, state)
-
+    if (graph.size > 100 && hostRendering) {
+      heart.publish(LifeCycleTypes.ON_FORM_HOST_RENDER, state)
+      env.hostRendering = false
+    }
     // 增加name透出真实路径，和0.x保持一致
     const result = {
       errors: payload.errors.map(item => ({
@@ -998,7 +1181,7 @@ export function createForm<FieldProps, VirtualFieldProps>(
 
     // 打印warnings日志从submit挪到这里
     if (warnings.length) {
-      console.warn(warnings)
+      log.warn(warnings)
     }
     if (errors.length > 0) {
       if (throwErrors) {
@@ -1015,9 +1198,7 @@ export function createForm<FieldProps, VirtualFieldProps>(
     callback?: (state: IFormState) => any,
     silent?: boolean
   ) {
-    env.leadingStage = true
     state.setState(callback, silent)
-    env.leadingStage = false
   }
 
   function getFormState(callback?: (state: IFormState) => any) {
@@ -1048,45 +1229,42 @@ export function createForm<FieldProps, VirtualFieldProps>(
     }
   }
 
+  function pushTaskQueue(pattern: FormPath, callback: () => void) {
+    const id = pattern.toString()
+    const taskIndex = env.taskIndexes[id]
+    if (isValid(taskIndex)) {
+      if (
+        env.taskQueue[taskIndex] &&
+        !env.taskQueue[taskIndex].callbacks.some(fn =>
+          isEqual(fn, callback) ? fn === callback : false
+        )
+      ) {
+        env.taskQueue[taskIndex].callbacks.push(callback)
+      }
+    } else {
+      env.taskIndexes[id] = env.taskQueue.length
+      env.taskQueue.push({
+        pattern,
+        callbacks: [callback]
+      })
+    }
+  }
+
   function setFieldState(
     path: FormPathPattern,
-    callback?: (state: IFieldState<FieldProps>) => void,
+    callback?: (state: IFieldState<FormilyCore.FieldProps>) => void,
     silent?: boolean
   ) {
     if (!isFn(callback)) return
     let matchCount = 0
-    let pattern = FormPath.getPath(path)
+    const pattern = FormPath.getPath(path)
     graph.select(pattern, field => {
       field.setState(callback, silent)
       matchCount++
     })
     if (matchCount === 0 || pattern.isWildMatchPattern) {
-      let taskIndex = env.taskIndexes[pattern.toString()]
-      if (isValid(taskIndex)) {
-        if (
-          env.taskQueue[taskIndex] &&
-          !env.taskQueue[taskIndex].callbacks.some(fn => isEqual(fn, callback))
-        ) {
-          env.taskQueue[taskIndex].callbacks.push(callback)
-        }
-      } else {
-        env.taskIndexes[pattern.toString()] = env.taskQueue.length
-        env.taskQueue.push({
-          pattern,
-          callbacks: [callback]
-        })
-      }
+      pushTaskQueue(pattern, callback)
     }
-  }
-
-  function userUpdating(field: IField | IVirtualField, fn?: () => void) {
-    if (!field) return
-    const nodePath = field.state.path
-    if (nodePath) env.userUpdateFields.push(nodePath)
-    if (isFn(fn)) {
-      fn()
-    }
-    env.userUpdateFields.pop()
   }
 
   function setFieldValue(path: FormPathPattern, value?: any, silent?: boolean) {
@@ -1127,7 +1305,7 @@ export function createForm<FieldProps, VirtualFieldProps>(
 
   function getFieldState(
     path: FormPathPattern,
-    callback?: (state: IFieldState<FieldProps>) => any
+    callback?: (state: IFieldState<FormilyCore.FieldProps>) => any
   ) {
     const field = graph.select(path)
     return field && field.getState(callback)
@@ -1143,7 +1321,9 @@ export function createForm<FieldProps, VirtualFieldProps>(
     each(
       nodes,
       (
-        node: IFieldState<FieldProps> | IVirtualFieldState<VirtualFieldProps>,
+        node:
+          | IFieldState<FormilyCore.FieldProps>
+          | IVirtualFieldState<FormilyCore.VirtualFieldProps>,
         key
       ) => {
         let nodeState: any
@@ -1204,15 +1384,30 @@ export function createForm<FieldProps, VirtualFieldProps>(
     }
   }
 
+  function isHostRendering() {
+    return env.hostRendering
+  }
+
+  function hostUpdate(callback?: () => any): any {
+    if (isFn(callback)) {
+      if (graph.size > 100) env.hostRendering = true
+      const result = callback()
+      if (graph.size > 100) {
+        heart.publish(LifeCycleTypes.ON_FORM_HOST_RENDER, state)
+        env.hostRendering = false
+      }
+      return result
+    }
+  }
+
   const state = new FormState(options)
   const validator = new FormValidator({
     ...options,
     matchStrategy
   })
-  const graph = new FormGraph({
+  const graph: FormGraph = new FormGraph({
     matchStrategy
   })
-  const applyWithScheduler = scheduler(options.validateConcurrentTimeMS)
   const formApi = {
     submit,
     reset,
@@ -1233,6 +1428,8 @@ export function createForm<FieldProps, VirtualFieldProps>(
     getFieldValue,
     setFieldInitialValue,
     getFieldInitialValue,
+    isHostRendering,
+    hostUpdate,
     subscribe: (callback?: FormHeartSubscriber) => {
       return heart.subscribe(callback)
     },
@@ -1256,14 +1453,14 @@ export function createForm<FieldProps, VirtualFieldProps>(
   })
   const env = {
     validateTimer: null,
+    syncFormStateTimer: null,
+    onChangeTimer: null,
     graphChangeTimer: null,
-    leadingStage: false,
+    hostRendering: false,
     publishing: {},
     taskQueue: [],
-    userUpdateFields: [],
     taskIndexes: {},
     removeNodes: {},
-    hiddenPendingFields: {},
     lastShownStates: {},
     submittingTask: undefined
   }
@@ -1289,6 +1486,7 @@ export const registerValidationMTEngine = FormValidator.registerMTEngine
 export {
   setValidationLanguage,
   setValidationLocale,
+  BigData,
   FormPath,
   FormPathPattern,
   FormGraph
