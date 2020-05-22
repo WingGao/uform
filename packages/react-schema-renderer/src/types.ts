@@ -12,6 +12,8 @@ import {
 } from '@formily/react'
 import { ValidatePatternRules } from '@formily/validator'
 import { Schema } from './shared/schema'
+export * from '@formily/react/lib/types'
+
 export interface ISchemaFieldProps {
   path?: FormPathPattern
   schema?: Schema
@@ -157,6 +159,9 @@ export interface ISchemaFormProps<
 > extends IFormProps<Value, DefaultValue, FormEffectPayload, FormActions> {
   schema?: ISchema
   fields?: ISchemaFormRegistry['fields']
+  components?: {
+    [key: string]: React.JSXElementConstructor<any>
+  }
   virtualFields?: ISchemaFormRegistry['virtualFields']
   formComponent?: ISchemaFormRegistry['formComponent']
   formItemComponent?: ISchemaFormRegistry['formItemComponent']
