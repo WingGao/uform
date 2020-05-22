@@ -84,28 +84,40 @@ export const CompatAntdFormItemProps = ({ children, ...props }) => (
 )
 
 export const CompatAntdFormItem: React.FC<ICompatItemProps> = props => {
-  const { prefixCls, labelAlign, labelCol, wrapperCol } = useFormItem()
+  const {
+    prefixCls,
+    labelAlign,
+    labelCol: contextLabelCol,
+    wrapperCol: contextWrapperCol
+  } = useFormItem()
   const help = computeHelp(props)
   const label = computeLabel(props)
   const status = computeStatus(props)
   const extra = computeExtra(props)
   const itemProps = computeSchemaExtendProps(props)
   const outerFormItemProps = useContext(FormItemPropsContext)
+
+  const mergedProps = {
+    ...itemProps,
+    ...outerFormItemProps,
+  }
+
+  const { labelCol, wrapperCol } = mergedProps
+
   return (
     <Form.Item
       prefixCls={prefixCls}
-      label={label}
-      labelCol={label ? normalizeCol(labelCol) : undefined}
+      label={label}      
       labelAlign={labelAlign}
-      required={props.required}
-      wrapperCol={label ? normalizeCol(wrapperCol) : undefined}
+      required={props.required}      
       help={help}
       validateStatus={status}
       extra={extra ? <p>{extra}</p> : undefined}
       colon={props.colon}
       className={props.className}
-      {...itemProps}
-      {...outerFormItemProps}
+      {...mergedProps}
+      labelCol={label ? normalizeCol(labelCol || contextLabelCol) : undefined}
+      wrapperCol={label ? normalizeCol(wrapperCol || contextWrapperCol) : undefined}
     >
       <CompatAntdFormItemProps>
         {props.beforeRender ? props.beforeRender() : false}

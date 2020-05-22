@@ -1,5 +1,5 @@
 import React from 'react'
-import { connect, registerFormField } from '@uform/react-schema-renderer'
+import { connect, registerFormField } from '@formily/react-schema-renderer'
 import { toArr, isArr, isEqual, mapStyledProps } from '../shared'
 import { Button, Upload } from '@alifd/next'
 import { UploadProps, CardProps } from '@alifd/next/types/upload'
@@ -163,7 +163,14 @@ registerFormField(
       }
 
       render() {
-        const { listType, locale, onChange, value, ...others } = this.props
+        const {
+          listType,
+          locale,
+          onChange,
+          value,
+          children,
+          ...others
+        } = this.props
 
         if (listType.indexOf('card') > -1) {
           return (
@@ -193,9 +200,13 @@ registerFormField(
             onChange={this.onChangeHandler}
             listType={listType}
           >
-            <Button style={{ margin: '0 0 10px' }}>
-              {(locale && locale.uploadText) || '上传文件'}
-            </Button>
+            {children ? (
+              children
+            ) : (
+              <Button style={{ margin: '0 0 10px' }}>
+                {(locale && locale.uploadText) || '上传文件'}
+              </Button>
+            )}
           </Upload>
         )
       }

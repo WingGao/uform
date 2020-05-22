@@ -4,9 +4,10 @@ import {
   createFormActions,
   createAsyncFormActions
 } from './shared'
-export * from '@uform/core'
+export * from '@formily/core'
 export * from './components/Form'
 export * from './components/Field'
+export * from './components/FieldList'
 export * from './components/VirtualField'
 export * from './components/FormSpy'
 export * from './components/FormProvider'

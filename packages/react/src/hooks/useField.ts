@@ -1,8 +1,7 @@
 import { useMemo, useEffect, useRef, useContext } from 'react'
-import { each, isFn } from '@uform/shared'
-import { IFieldState, IForm, IField, IMutators } from '@uform/core'
+import { isFn } from '@formily/shared'
+import { IFieldState, IForm, IField, IMutators } from '@formily/core'
 import { getValueFromEvent } from '../shared'
-import { useDirty } from './useDirty'
 import { useForceUpdate } from './useForceUpdate'
 import { IFieldHook, IFieldStateUIProps } from '../types'
 import FormContext from '../context'
@@ -30,14 +29,6 @@ const extendMutators = (
 
 export const useField = (options: IFieldStateUIProps): IFieldHook => {
   const forceUpdate = useForceUpdate()
-  const dirty = useDirty(options, [
-    'props',
-    'rules',
-    'required',
-    'editable',
-    'visible',
-    'display'
-  ])
   const ref = useRef<{
     field: IField
     unmounted: boolean
@@ -51,13 +42,14 @@ export const useField = (options: IFieldStateUIProps): IFieldHook => {
   if (!form) {
     throw new Error('Form object cannot be found from context.')
   }
+
   const mutators = useMemo(() => {
     let initialized = false
     ref.current.field = form.registerField(options)
     ref.current.subscriberId = ref.current.field.subscribe(fieldState => {
       if (ref.current.unmounted) return
       /**
-       * 同步Field状态只需要forceUpdate一下触发重新渲染，因为字段状态全部代理在uform core内部
+       * 同步Field状态只需要forceUpdate一下触发重新渲染，因为字段状态全部代理在formily core内部
        */
       if (initialized) {
         if (options.triggerType === 'onChange' && !fieldState.pristine) {
@@ -73,15 +65,16 @@ export const useField = (options: IFieldStateUIProps): IFieldHook => {
   }, [])
 
   useEffect(() => {
-    if (dirty.num > 0) {
-      ref.current.field.setState((state: IFieldState) => {
-        each(dirty.dirtys, (result, key) => {
-          if (result) {
-            state[key] = options[key]
-          }
+    //考虑到组件被unmount，props diff信息会被销毁，导致diff异常，所以需要代理在一个持久引用上
+    ref.current.field.watchProps(
+      options,
+      ['props', 'rules', 'required', 'editable', 'visible', 'display'],
+      (props: any) => {
+        ref.current.field.setState((state: IFieldState) => {
+          Object.assign(state, props)
         })
-      })
-    }
+      }
+    )
   })
 
   useEffect(() => {

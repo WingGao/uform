@@ -1,20 +1,15 @@
 import { ButtonProps } from '@alifd/next/types/button'
 import { FormProps, ItemProps } from '@alifd/next/types/form'
 import { StepProps, ItemProps as StepItemProps } from '@alifd/next/types/step'
-import { ColumnProps, TableProps } from '@alifd/next/types/table'
+import { ColumnProps } from '@alifd/next/types/table'
 import {
   ISchemaFormProps,
   IMarkupSchemaFieldProps,
   ISchemaFieldComponentProps,
   FormPathPattern
-} from '@uform/react-schema-renderer'
-import { PreviewTextConfigProps } from '@uform/react-shared-components'
+} from '@formily/react-schema-renderer'
+import { PreviewTextConfigProps } from '@formily/react-shared-components'
 import { StyledComponent } from 'styled-components'
-import {
-  DragObjectWithType,
-  ConnectDragSource,
-  ConnectDragPreview
-} from 'react-dnd'
 
 type ColSpanType = number | string
 
@@ -106,35 +101,9 @@ export interface IFormStep extends StepProps {
   dataSource: Array<StepItemProps & { name: FormPathPattern }>
 }
 
-export interface IDragObject<T = any> extends DragObjectWithType {
-  id: T
-  index: number
-}
-
-export interface ICollectedProps {
-  isOver: boolean
-  dragingIndex: number
-}
-
-export type onMoveRowCallback = (dragIndex: number, dropIndex: number) => void
-
-export type IDragHandlerCellProps = React.PropsWithChildren<{
-  drag: ConnectDragSource
-}>
-
-export type IDragableRowWrapperProps = React.PropsWithChildren<{
-  rowIndex: number
-  moveRow: onMoveRowCallback
-  preview: ConnectDragPreview
-}>
+export type IDragHandlerCellProps = React.PropsWithChildren<{}>
 
 export interface IDragableRowProps {
-  rowIndex: number
-  moveRow: onMoveRowCallback
   columns: ColumnProps[]
-  record: { [key: string]: any }
-}
-
-export interface IDragableTableProps extends TableProps {
-  onMoveRow: onMoveRowCallback
+  className?: string
 }

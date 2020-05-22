@@ -1,5 +1,5 @@
 import { useContext, useEffect } from 'react'
-import { isStateModel, IForm } from '@uform/core'
+import { isStateModel, IForm } from '@formily/core'
 import FormContext from '../context'
 import { useEva } from 'react-eva'
 import { IFormEffect } from '../types'

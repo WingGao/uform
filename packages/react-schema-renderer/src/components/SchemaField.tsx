@@ -1,6 +1,6 @@
 import React, { useContext, Fragment } from 'react'
-import { Field, VirtualField, IFieldState } from '@uform/react'
-import { FormPath, isFn, isStr, isEqual, isValid } from '@uform/shared'
+import { Field, VirtualField, IFieldState } from '@formily/react'
+import { FormPath, isFn, isStr, isEqual, isValid } from '@formily/shared'
 import {
   ISchemaFieldProps,
   ISchemaFieldComponentProps,
@@ -60,6 +60,7 @@ export const SchemaField: React.FunctionComponent<ISchemaFieldProps> = (
         path={path}
         initialValue={fieldSchema.default}
         props={fieldSchema.getSelfProps()}
+        dataType={fieldSchema.type}
         triggerType={fieldSchema.getExtendsTriggerType()}
         editable={fieldSchema.getExtendsEditable()}
         visible={fieldSchema.getExtendsVisible()}
