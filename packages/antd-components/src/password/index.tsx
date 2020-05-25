@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React from 'react'
 import { connect } from '@formily/react-schema-renderer'
 import { Input } from 'antd'
 import { PasswordProps } from 'antd/lib/input'

@@ -20,7 +20,7 @@ interface SelectOption {
   [key: string]: any
 }
 
-type SelectProps = AntSelectProps & {
+type SelectProps = AntSelectProps<any> & {
   dataSource?: SelectOption[]
 }
 

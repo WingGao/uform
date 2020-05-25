@@ -7,13 +7,11 @@ import {
 import { createVirtualBox } from '@formily/react-schema-renderer'
 import { toArr } from '@formily/shared'
 import { Row, Col } from 'antd'
+import { ButtonProps } from 'antd/lib/button'
 import { FormItemProps as ItemProps } from 'antd/lib/form'
 import { IFormItemGridProps, IItemProps } from '../types'
 import { normalizeCol } from '../shared'
 
-export const FormItemGrid = createVirtualBox<
-  React.PropsWithChildren<IFormItemGridProps & ItemProps & IItemProps>
->('grid', FormItemGridComponent)
 export const FormItemGridComponent = props => {
   const {
     cols: rawCols,
@@ -28,8 +26,8 @@ export const FormItemGridComponent = props => {
   const childNum = children.length
 
   if (cols.length < childNum) {
-    let offset: number = childNum - cols.length
-    let lastSpan: number =
+    const offset: number = childNum - cols.length
+    const lastSpan: number =
       24 -
       cols.reduce((buf, col) => {
         return (
@@ -47,10 +45,10 @@ export const FormItemGridComponent = props => {
       {children.reduce((buf, child, key) => {
         return child
           ? buf.concat(
-            <Col key={key} {...cols[key]}>
-              {child}
-            </Col>
-          )
+              <Col key={key} {...cols[key]}>
+                {child}
+              </Col>
+            )
           : buf
       }, [])}
     </Row>
@@ -65,5 +63,9 @@ export const FormItemGridComponent = props => {
   }
   return <Fragment>{grids}</Fragment>
 }
+
+export const FormItemGrid = createVirtualBox<
+  React.PropsWithChildren<IFormItemGridProps & ItemProps & IItemProps>
+>('grid', FormItemGridComponent)
 
 export default FormItemGrid
