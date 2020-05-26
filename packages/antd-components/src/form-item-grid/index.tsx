@@ -7,7 +7,6 @@ import {
 import { createVirtualBox } from '@formily/react-schema-renderer'
 import { toArr } from '@formily/shared'
 import { Row, Col } from 'antd'
-import { ButtonProps } from 'antd/lib/button'
 import { FormItemProps as ItemProps } from 'antd/lib/form'
 import { IFormItemGridProps, IItemProps } from '../types'
 import { normalizeCol } from '../shared'
