@@ -2,7 +2,7 @@ import React, { useContext, Fragment } from 'react'
 import { isNum, isFn, toArr } from '@formily/shared'
 import { ArrayContext } from '../context'
 
-export const useArrayList = (index: number = 0) => {
+export const useArrayList = (index = 0) => {
   const {
     value,
     disabled,
@@ -10,6 +10,7 @@ export const useArrayList = (index: number = 0) => {
     minItems,
     maxItems,
     renders,
+    movable,
     ...props
   } = useContext(ArrayContext)
 
@@ -38,8 +39,10 @@ export const useArrayList = (index: number = 0) => {
 
   const isEmpty = !newValue || (newValue && newValue.length <= 0)
   const isDisable = disabled || editable === false
-  const allowMoveUp = newValue && newValue.length > 1 && !isDisable
-  const allowMoveDown = newValue && newValue.length > 1 && !isDisable
+  const isMovable = movable == null ? true : movable
+  const allowMoveUp = newValue && newValue.length > 1 && !isDisable && isMovable
+  const allowMoveDown =
+    newValue && newValue.length > 1 && !isDisable && isMovable
   const allowRemove = isNum(minItems)
     ? newValue.length > minItems && !isDisable
     : !isDisable

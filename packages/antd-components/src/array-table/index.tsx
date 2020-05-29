@@ -74,6 +74,7 @@ export const ArrayTable: any = styled(
       operationsWidth,
       operations,
       newValue,
+      movable,
       draggable,
       ...componentProps
     } = schema.getExtendsComponentProps() || {}
@@ -189,6 +190,7 @@ export const ArrayTable: any = styled(
             renderMoveUp,
             renderEmpty
           }}
+          movable={movable}
         >
           {draggable ? (
             <DragListView

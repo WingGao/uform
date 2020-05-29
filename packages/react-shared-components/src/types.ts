@@ -55,6 +55,7 @@ export interface IArrayListProps {
     renderRemove?: ReactRenderPropsChildren<number>
   }
   context?: any
+  movable?: boolean
 }
 
 export interface IArrayListWrapperProps {
