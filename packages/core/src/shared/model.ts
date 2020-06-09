@@ -11,7 +11,7 @@ import {
   defaults,
   shallowClone
 } from '@formily/shared'
-import { Draft, Immer, enablePatches, setAutoFreeze } from 'immer'
+import { Draft, Immer, enablePatches, enableMapSet, setAutoFreeze } from 'immer'
 import {
   IStateModelProvider,
   IStateModelFactory,
@@ -22,6 +22,7 @@ import {
 const hasProxy = !!globalThisPolyfill.Proxy
 
 enablePatches()
+enableMapSet()
 
 setAutoFreeze(false)
 
